@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gesture Ludo - Human vs AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .mirror-container { transform: scaleX(-1); }
+        #output_canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none;
+        }
+        /* Ludo Board Grid Setup */
+        #ludo-board {
+            display: grid;
+            grid-template-columns: repeat(15, 1fr);
+            grid-template-rows: repeat(15, 1fr);
+            aspect-ratio: 1 / 1;
+            width: 100%;
+            max-width: 600px;
+            margin: 0 auto;
+            border: 4px solid #1e293b;
+            background-color: #f8fafc;
+            position: relative;
+            transition: box-shadow 0.5s;
+        }
+        .ludo-cell {
+            border: 1px solid #cbd5e1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+        .home-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15%;
+        }
+        .home-inner {
+            width: 100%; height: 100%;
+            background-color: white;
+            border-radius: 10%;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 15%; padding: 15%;
+        }
+        /* Token Styling */
+        .ludo-token {
+            border-radius: 50%;
+            box-shadow: inset -2px -3px 6px rgba(0,0,0,0.4), 0 3px 5px rgba(0,0,0,0.5);
+            border: 2px solid rgba(255,255,255,0.8);
+            position: absolute;
+            z-index: 10;
+            cursor: pointer;
+            transition: all 0.3s ease-in-out;
+            width: 70%;
+            height: 70%;
+            max-width: 25px;
+            max-height: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.95);
+            text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.8);
+        }
+        .token-red { background: radial-gradient(circle at 30% 30%, #f87171, #dc2626); }
+        .token-green { background: radial-gradient(circle at 30% 30%, #4ade80, #16a34a); }
+        .token-yellow { background: radial-gradient(circle at 30% 30%, #fde047, #ca8a04); }
+        .token-blue { background: radial-gradient(circle at 30% 30%, #60a5fa, #2563eb); }
+        
+        /* 3D Translucent Red Dice */
+        .scene {
+            width: 80px;
+            height: 80px;
+            perspective: 400px;
+            margin: 10px;
+        }
+        .cube {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+            transform: translateZ(-40px) rotateX(-15deg) rotateY(15deg);
+            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .cube.rolling {
+            animation: spinDice 0.5s linear infinite;
+        }
+        @keyframes spinDice {
+            0% { transform: translateZ(-40px) rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+            100% { transform: translateZ(-40px) rotateX(720deg) rotateY(1080deg) rotateZ(360deg); }
+        }
+        .cube-face {
+            position: absolute;
+            width: 80px;
+            height: 80px;
+            background: rgba(220, 10, 30, 0.7);
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 12px;
+            box-shadow: inset 0 0 15px rgba(150, 0, 0, 0.9), 0 0 10px rgba(255, 0, 0, 0.3);
+            backdrop-filter: blur(2px);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            padding: 10px;
+        }
+        .pip {
+            width: 14px;
+            height: 14px;
+            background-color: white;
+            border-radius: 50%;
+            box-shadow: inset 0px 3px 5px rgba(0,0,0,0.5);
+            justify-self: center;
+            align-self: center;
+        }
+        
+        .front  { transform: rotateY(  0deg) translateZ(40px); }
+        .back   { transform: rotateY(180deg) translateZ(40px); }
+        .right  { transform: rotateY( 90deg) translateZ(40px); }
+        .left   { transform: rotateY(-90deg) translateZ(40px); }
+        .top    { transform: rotateX( 90deg) translateZ(40px); }
+        .bottom { transform: rotateX(-90deg) translateZ(40px); }
+    </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+
+    <!-- Header -->
+    <header class="border-b border-slate-900 bg-slate-900/50 px-6 py-4">
+        <div class="max-w-[1600px] mx-auto flex items-center gap-3">
+            <div class="p-2.5 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl text-slate-950 font-bold">
+                <i class="fa-solid fa-robot text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-teal-400">
+                    Gesture Ludo: 1v1
+                </h1>
+                <p id="header-subtitle" class="text-xs text-slate-400 font-medium">Choose your color to begin!</p>
+            </div>
+            <div class="ml-auto flex items-center gap-2 font-mono text-xs">
+                <span id="system-status" class="text-slate-400">Awaiting Selection...</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- App Container -->
+    <main class="flex-grow max-w-[1600px] w-full mx-auto p-4 flex flex-col justify-center">
+        
+        <!-- COLOR SELECTION SCREEN -->
+        <div id="selection-screen" class="flex flex-col items-center justify-center py-12 px-4 w-full max-w-3xl mx-auto text-center">
+            <h2 class="text-3xl md:text-4xl font-black text-slate-100 mb-2">Pick Your Team</h2>
+            <p class="text-slate-400 mb-10">You will play as this color against 1 computer-controlled Bot.</p>
+            
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 w-full">
+                <!-- Red Button -->
+                <button onclick="startGame('red')" class="group p-6 rounded-2xl border-2 border-slate-800 hover:border-red-500 bg-slate-900 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(239,68,68,0.3)] flex flex-col items-center gap-4">
+                    <div class="w-16 h-16 rounded-full token-red shadow-lg border-2 border-white/80 group-hover:animate-bounce"></div>
+                    <span class="text-red-400 font-bold tracking-widest">RED</span>
+                </button>
+                <!-- Green Button -->
+                <button onclick="startGame('green')" class="group p-6 rounded-2xl border-2 border-slate-800 hover:border-green-500 bg-slate-900 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(34,197,94,0.3)] flex flex-col items-center gap-4">
+                    <div class="w-16 h-16 rounded-full token-green shadow-lg border-2 border-white/80 group-hover:animate-bounce"></div>
+                    <span class="text-green-400 font-bold tracking-widest">GREEN</span>
+                </button>
+                <!-- Yellow Button -->
+                <button onclick="startGame('yellow')" class="group p-6 rounded-2xl border-2 border-slate-800 hover:border-yellow-400 bg-slate-900 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(234,179,8,0.3)] flex flex-col items-center gap-4">
+                    <div class="w-16 h-16 rounded-full token-yellow shadow-lg border-2 border-white/80 group-hover:animate-bounce"></div>
+                    <span class="text-yellow-400 font-bold tracking-widest">YELLOW</span>
+                </button>
+                <!-- Blue Button -->
+                <button onclick="startGame('blue')" class="group p-6 rounded-2xl border-2 border-slate-800 hover:border-blue-500 bg-slate-900 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] flex flex-col items-center gap-4">
+                    <div class="w-16 h-16 rounded-full token-blue shadow-lg border-2 border-white/80 group-hover:animate-bounce"></div>
+                    <span class="text-blue-400 font-bold tracking-widest">BLUE</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- GAME CONTAINER (Hidden until color is selected) -->
+        <div id="game-container" class="hidden flex-col md:flex-row gap-6 w-full h-full">
+            
+            <!-- LEFT COLUMN: Live Camera (40%) -->
+            <div class="w-full md:w-[40%] flex flex-col gap-4">
+                
+                <div class="relative bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden aspect-[4/3] flex items-center justify-center shadow-xl">
+                    <div id="loadingSpinner" class="absolute z-20 flex flex-col items-center gap-3">
+                        <div class="w-10 h-10 border-4 border-slate-800 border-t-emerald-400 rounded-full animate-spin"></div>
+                        <span class="text-sm text-emerald-400 font-semibold animate-pulse">Loading Hand Tracking...</span>
+                    </div>
+                    <div class="mirror-container w-full h-full relative z-10">
+                        <video id="webcam" class="w-full h-full object-cover" autoplay playsinline></video>
+                        <canvas id="output_canvas"></canvas>
+                    </div>
+                </div>
+
+                <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4 shadow-md">
+                    <button id="webcamButton" disabled class="w-full px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 mb-3">
+                        <i class="fa-solid fa-video"></i>
+                        <span>Start Webcam</span>
+                    </button>
+                    <div class="flex justify-between text-xs text-slate-400 font-mono bg-slate-950 p-2 rounded-lg border border-slate-800">
+                        <span id="instruction-status">Action: Waiting for game...</span>
+                        <span id="pinch-status" class="text-emerald-400">Offline</span>
+                    </div>
+                </div>
+
+                <!-- NEW: Dice Roller Area (Moved to Left Column) -->
+                <div class="w-full bg-slate-950 rounded-2xl border border-slate-800 p-4 flex flex-col xl:flex-row items-center justify-between shadow-inner gap-4">
+                    <div class="flex items-center gap-4">
+                        <div id="dice-container" class="scene shrink-0">
+                            <div class="cube" id="dice-cube">
+                                <div class="cube-face front"><span class="pip" style="grid-area: 2 / 2;"></span></div>
+                                <div class="cube-face top"><span class="pip" style="grid-area: 1 / 1;"></span><span class="pip" style="grid-area: 3 / 3;"></span></div>
+                                <div class="cube-face right"><span class="pip" style="grid-area: 1 / 1;"></span><span class="pip" style="grid-area: 2 / 2;"></span><span class="pip" style="grid-area: 3 / 3;"></span></div>
+                                <div class="cube-face left"><span class="pip" style="grid-area: 1 / 1;"></span><span class="pip" style="grid-area: 1 / 3;"></span><span class="pip" style="grid-area: 3 / 1;"></span><span class="pip" style="grid-area: 3 / 3;"></span></div>
+                                <div class="cube-face bottom"><span class="pip" style="grid-area: 1 / 1;"></span><span class="pip" style="grid-area: 1 / 3;"></span><span class="pip" style="grid-area: 2 / 2;"></span><span class="pip" style="grid-area: 3 / 1;"></span><span class="pip" style="grid-area: 3 / 3;"></span></div>
+                                <div class="cube-face back"><span class="pip" style="grid-area: 1 / 1;"></span><span class="pip" style="grid-area: 1 / 3;"></span><span class="pip" style="grid-area: 2 / 1;"></span><span class="pip" style="grid-area: 2 / 3;"></span><span class="pip" style="grid-area: 3 / 1;"></span><span class="pip" style="grid-area: 3 / 3;"></span></div>
+                            </div>
+                        </div>
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-200">Current Roll</h3>
+                            <p id="dice-result" class="text-sm text-emerald-400 tracking-wide font-mono">Ready to play...</p>
+                        </div>
+                    </div>
+                    <button onclick="triggerDiceRoll()" id="manualRollBtn" class="w-full xl:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition-colors border border-slate-700 whitespace-nowrap">
+                        Manual Roll
+                    </button>
+                </div>
+
+            </div>
+
+            <!-- RIGHT COLUMN: Ludo Board ONLY (60%) -->
+            <div class="w-full md:w-[60%] flex flex-col items-center justify-center bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative">
+                
+                <!-- TURN INDICATOR -->
+                <div id="turn-banner" class="w-full max-w-md mb-4 py-2 px-4 rounded-xl border border-slate-500/30 bg-slate-500/10 text-center transition-colors duration-500">
+                    <h2 class="text-slate-400 font-bold tracking-widest uppercase text-sm" id="turn-text">Initializing...</h2>
+                </div>
+
+                <!-- Dynamic CSS Grid Ludo Board -->
+                <div id="ludo-board" class="shadow-2xl">
+                    <!-- JavaScript will populate the 225 grid cells and tokens here -->
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- Application Script -->
+    <script type="module">
+        import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
+
+        // DOM elements
+        const video = document.getElementById('webcam');
+        const canvasElement = document.getElementById('output_canvas');
+        const canvasCtx = canvasElement.getContext('2d');
+        const enableWebcamButton = document.getElementById('webcamButton');
+        const pinchStatus = document.getElementById('pinch-status');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        const systemStatusText = document.getElementById('system-status');
+        const manualRollBtn = document.getElementById('manualRollBtn');
+
+        let handLandmarker;
+        let webcamRunning = false;
+        let lastVideoTime = -1;
+        let isPinched = false;
+        let lastRollTime = 0;
+        
+        // Gesture Selection State
+        let detectedFingers = 0;
+        let fingerHoldStartTime = 0;
+
+        // --- LUDO GAME LOGIC & STATE ---
+
+        const MAIN_PATH = [
+            [6,1],[6,2],[6,3],[6,4],[6,5], [5,6],[4,6],[3,6],[2,6],[1,6],[0,6],
+            [0,7],[0,8], [1,8],[2,8],[3,8],[4,8],[5,8], [6,9],[6,10],[6,11],[6,12],[6,13],[6,14],
+            [7,14],[8,14], [8,13],[8,12],[8,11],[8,10],[8,9], [9,8],[10,8],[11,8],[12,8],[13,8],[14,8],
+            [14,7],[14,6], [13,6],[12,6],[11,6],[10,6],[9,6], [8,5],[8,4],[8,3],[8,2],[8,1],[8,0],
+            [7,0],[6,0]
+        ];
+
+        const HOME_STRETCHES = {
+            red:    [[7,1], [7,2], [7,3], [7,4], [7,5]],
+            green:  [[1,7], [2,7], [3,7], [4,7], [5,7]],
+            yellow: [[7,13], [7,12], [7,11], [7,10], [7,9]],
+            blue:   [[13,7], [12,7], [11,7], [10,7], [9,7]]
+        };
+
+        const START_INDICES = { red: 0, green: 13, yellow: 26, blue: 39 };
+
+        const SAFE_ZONES = [
+            [6,1], [1,8], [8,13], [13,6], 
+            [8,2], [2,6], [12,8], [6,12]  
+        ];
+
+        function isSafeZone(r, c) {
+            return SAFE_ZONES.some(zone => zone[0] === r && zone[1] === c);
+        }
+
+        // Default Game State
+        const gameState = {
+            winner: null,
+            currentPlayer: 'red',
+            turnOrder: [], // Will be set to 2 players during selection
+            playerTypes: {},
+            currentRoll: 0,
+            hasRolled: false,
+            tokens: {
+                red:    [ {id:0, state:'home', pos:-1}, {id:1, state:'home', pos:-1}, {id:2, state:'home', pos:-1}, {id:3, state:'home', pos:-1} ],
+                green:  [ {id:0, state:'home', pos:-1}, {id:1, state:'home', pos:-1}, {id:2, state:'home', pos:-1}, {id:3, state:'home', pos:-1} ],
+                yellow: [ {id:0, state:'home', pos:-1}, {id:1, state:'home', pos:-1}, {id:2, state:'home', pos:-1}, {id:3, state:'home', pos:-1} ],
+                blue:   [ {id:0, state:'home', pos:-1}, {id:1, state:'home', pos:-1}, {id:2, state:'home', pos:-1}, {id:3, state:'home', pos:-1} ]
+            }
+        };
+
+        // --- LOBBY SELECTION LOGIC (1v1) ---
+        window.startGame = function(chosenColor) {
+            // Assign opposite color as the bot to keep distance on the board
+            const opposites = {
+                'red': 'yellow',
+                'yellow': 'red',
+                'green': 'blue',
+                'blue': 'green'
+            };
+            const botColor = opposites[chosenColor];
+
+            gameState.playerTypes[chosenColor] = 'human';
+            gameState.playerTypes[botColor] = 'bot';
+            
+            // Only 2 players in the game now
+            gameState.turnOrder = [chosenColor, botColor];
+            gameState.currentPlayer = chosenColor; // Human starts first!
+
+            // Remove tokens for the unused colors so they don't render
+            ['red', 'green', 'yellow', 'blue'].forEach(c => {
+                if (c !== chosenColor && c !== botColor) {
+                    gameState.tokens[c] = []; 
+                }
+            });
+
+            document.getElementById('header-subtitle').innerText = `You are ${chosenColor.toUpperCase()}. The computer controls ${botColor.toUpperCase()}.`;
+
+            document.getElementById('selection-screen').classList.add('hidden');
+            document.getElementById('game-container').classList.remove('hidden');
+            document.getElementById('game-container').classList.add('flex');
+
+            systemStatusText.innerText = "Initializing Engine...";
+            drawLudoBoard();
+            updateGameUI();
+            renderTokens();
+            initializeHandTracking();
+        }
+
+        // 1. Draw Ludo Board Function
+        function drawLudoBoard() {
+            const board = document.getElementById('ludo-board');
+            board.innerHTML = ''; 
+            
+            const hex = { red: '#ff0000', green: '#00a200', blue: '#0078d7', yellow: '#ffe400' };
+
+            for (let r = 0; r < 15; r++) {
+                for (let c = 0; c < 15; c++) {
+                    if ((r < 6 && c < 6 && !(r === 0 && c === 0)) ||
+                        (r < 6 && c > 8 && !(r === 0 && c === 9)) ||
+                        (r > 8 && c < 6 && !(r === 9 && c === 0)) ||
+                        (r > 8 && c > 8 && !(r === 9 && c === 9))) {
+                        continue; 
+                    }
+
+                    if (r > 5 && r < 9 && c > 5 && c < 9 && !(r === 6 && c === 6)) {
+                        continue;
+                    }
+
+                    const cell = document.createElement('div');
+                    cell.className = 'ludo-cell';
+                    cell.id = `cell-${r}-${c}`;
+                    cell.style.backgroundColor = '#ffffff';
+                    
+                    cell.style.gridRow = `${r + 1}`;
+                    cell.style.gridColumn = `${c + 1}`;
+
+                    if (r === 0 && c === 0) setupHomeBase(cell, 'red', hex.red, r, c);
+                    else if (r === 0 && c === 9) setupHomeBase(cell, 'green', hex.green, r, c);
+                    else if (r === 9 && c === 0) setupHomeBase(cell, 'blue', hex.blue, r, c);
+                    else if (r === 9 && c === 9) setupHomeBase(cell, 'yellow', hex.yellow, r, c);
+                    
+                    else if (r === 6 && c === 6) {
+                        cell.style.gridRow = '7 / span 3';
+                        cell.style.gridColumn = '7 / span 3';
+                        cell.id = 'center-finish';
+                        cell.style.background = `conic-gradient(from 45deg, ${hex.green} 0deg 90deg, ${hex.yellow} 90deg 180deg, ${hex.blue} 180deg 270deg, ${hex.red} 270deg 360deg)`;
+                        board.appendChild(cell);
+                    }
+                    else {
+                        if (r === 6 && c === 1) { cell.style.backgroundColor = hex.red; cell.innerHTML = '<i class="fa-solid fa-arrow-right text-white font-bold"></i>'; }
+                        else if (r === 1 && c === 8) { cell.style.backgroundColor = hex.green; cell.innerHTML = '<i class="fa-solid fa-arrow-down text-white font-bold"></i>'; }
+                        else if (r === 8 && c === 13) { cell.style.backgroundColor = hex.yellow; cell.innerHTML = '<i class="fa-solid fa-arrow-left text-black font-bold"></i>'; }
+                        else if (r === 13 && c === 6) { cell.style.backgroundColor = hex.blue; cell.innerHTML = '<i class="fa-solid fa-arrow-up text-white font-bold"></i>'; }
+                        
+                        else if (r === 7 && c > 0 && c < 6) cell.style.backgroundColor = hex.red;
+                        else if (c === 7 && r > 0 && r < 6) cell.style.backgroundColor = hex.green;
+                        else if (r === 7 && c > 8 && c < 14) cell.style.backgroundColor = hex.yellow;
+                        else if (c === 7 && r > 8 && r < 14) cell.style.backgroundColor = hex.blue;
+
+                        else if ((r === 8 && c === 2) || (r === 2 && c === 6) || (r === 12 && c === 8) || (r === 6 && c === 12)) { 
+                            cell.innerHTML = '<i class="fa-regular fa-star text-slate-800 text-xl"></i>'; 
+                        }
+                        board.appendChild(cell);
+                    }
+                }
+            }
+        }
+
+        function setupHomeBase(cell, colorStr, bgColor, r, c) {
+            cell.style.gridRow = `${r + 1} / span 6`;
+            cell.style.gridColumn = `${c + 1} / span 6`;
+            cell.classList.add('home-container');
+            cell.style.backgroundColor = bgColor;
+            
+            cell.innerHTML = `
+                <div class="home-inner shadow-inner">
+                    <div id="home-${colorStr}-0" class="rounded-full w-full h-full relative flex items-center justify-center border border-black/20" style="background-color: ${bgColor};"></div>
+                    <div id="home-${colorStr}-1" class="rounded-full w-full h-full relative flex items-center justify-center border border-black/20" style="background-color: ${bgColor};"></div>
+                    <div id="home-${colorStr}-2" class="rounded-full w-full h-full relative flex items-center justify-center border border-black/20" style="background-color: ${bgColor};"></div>
+                    <div id="home-${colorStr}-3" class="rounded-full w-full h-full relative flex items-center justify-center border border-black/20" style="background-color: ${bgColor};"></div>
+                </div>
+            `;
+            document.getElementById('ludo-board').appendChild(cell);
+        }
+
+        // 2. Render Tokens on the Board
+        function renderTokens() {
+            document.querySelectorAll('.ludo-token').forEach(el => el.remove());
+
+            Object.keys(gameState.tokens).forEach(color => {
+                gameState.tokens[color].forEach(token => {
+                    const tokenEl = document.createElement('div');
+                    tokenEl.className = `ludo-token token-${color}`;
+                    tokenEl.innerText = token.id + 1; 
+                    
+                    let isClickable = false;
+                    // Only pulse if it's the Human's turn
+                    if (gameState.hasRolled && color === gameState.currentPlayer && !gameState.winner && gameState.playerTypes[color] === 'human') {
+                        if (token.state === 'home' && gameState.currentRoll === 6) isClickable = true;
+                        if (token.state === 'active' && token.pos + gameState.currentRoll <= 56) isClickable = true;
+                    }
+                    
+                    if (isClickable) {
+                        tokenEl.classList.add('animate-pulse', 'ring-4', 'ring-white', 'scale-110');
+                        tokenEl.onclick = () => handleTokenMove(color, token.id);
+                    }
+
+                    let targetCellId = null;
+                    if (token.state === 'home') {
+                        targetCellId = `home-${color}-${token.id}`;
+                    } else if (token.state === 'active' || token.state === 'finished') {
+                        if (token.pos < 51) {
+                            const absPos = (START_INDICES[color] + token.pos) % 52;
+                            const coords = MAIN_PATH[absPos];
+                            targetCellId = `cell-${coords[0]}-${coords[1]}`;
+                        } else if (token.pos < 56) {
+                            const coords = HOME_STRETCHES[color][token.pos - 51];
+                            targetCellId = `cell-${coords[0]}-${coords[1]}`;
+                        } else {
+                            targetCellId = 'center-finish';
+                            tokenEl.style.width = '30%'; 
+                            tokenEl.style.height = '30%';
+                            tokenEl.classList.remove('animate-pulse', 'ring-4', 'scale-110');
+                        }
+                    }
+
+                    if (targetCellId) {
+                        const cell = document.getElementById(targetCellId);
+                        if (cell) cell.appendChild(tokenEl);
+                    }
+                });
+            });
+        }
+
+        // 3. Token Move Logic & Capturing Rules
+        function handleTokenMove(color, tokenId) {
+            if (gameState.winner) return;
+
+            const token = gameState.tokens[color].find(t => t.id === tokenId);
+            let bonusTurn = false;
+            
+            if (token.state === 'home' && gameState.currentRoll === 6) {
+                token.state = 'active';
+                token.pos = 0;
+            } 
+            else if (token.state === 'active') {
+                token.pos += gameState.currentRoll;
+                
+                if (token.pos === 56) {
+                    token.state = 'finished';
+                    bonusTurn = true;
+                    document.getElementById('dice-result').innerText = `Token Finished! Bonus turn!`;
+                    document.getElementById('dice-result').classList.replace('text-emerald-400', 'text-yellow-400');
+                }
+                else if (token.pos < 51) { 
+                    const absPos = (START_INDICES[color] + token.pos) % 52;
+                    const targetCoords = MAIN_PATH[absPos];
+                    
+                    if (!isSafeZone(targetCoords[0], targetCoords[1])) {
+                        Object.keys(gameState.tokens).forEach(otherColor => {
+                            if (otherColor !== color) {
+                                gameState.tokens[otherColor].forEach(otherToken => {
+                                    if (otherToken.state === 'active' && otherToken.pos < 51) {
+                                        const otherAbsPos = (START_INDICES[otherColor] + otherToken.pos) % 52;
+                                        const otherCoords = MAIN_PATH[otherAbsPos];
+                                        
+                                        if (targetCoords[0] === otherCoords[0] && targetCoords[1] === otherCoords[1]) {
+                                            otherToken.state = 'home';
+                                            otherToken.pos = -1;
+                                            bonusTurn = true;
+                                            document.getElementById('dice-result').innerText = `Captured ${otherColor}! Bonus turn!`;
+                                            document.getElementById('dice-result').classList.replace('text-emerald-400', 'text-yellow-400');
+                                        }
+                                    }
+                                });
+                            }
+                        });
+                    }
+                }
+            }
+
+            const hasWon = gameState.tokens[color].every(t => t.state === 'finished');
+            if (hasWon) {
+                gameState.winner = color;
+                document.getElementById('dice-result').innerText = `${color.toUpperCase()} WINS THE GAME!`;
+                document.getElementById('dice-result').className = 'text-xl text-yellow-400 font-black animate-bounce mt-4';
+                
+                const hexColors = {red: '#ff0000', green: '#00a200', blue: '#0078d7', yellow: '#ffe400'};
+                document.getElementById('ludo-board').style.boxShadow = `0 0 50px ${hexColors[color]}`;
+                
+                updateGameUI();
+                renderTokens();
+                return;
+            }
+
+            gameState.hasRolled = false;
+            
+            if (gameState.currentRoll !== 6 && !bonusTurn) {
+                const currentIdx = gameState.turnOrder.indexOf(gameState.currentPlayer);
+                // Use dynamic turnOrder.length to cycle correctly between the 2 active players
+                gameState.currentPlayer = gameState.turnOrder[(currentIdx + 1) % gameState.turnOrder.length];
+            }
+            
+            updateGameUI();
+            renderTokens();
+        }
+
+        // 4. Update Header UI & Check for AI Turns
+        function updateGameUI() {
+            const banner = document.getElementById('turn-banner');
+            const text = document.getElementById('turn-text');
+            const instructionStatus = document.getElementById('instruction-status');
+            
+            if (gameState.winner) {
+                banner.className = `w-full max-w-md mb-4 py-2 px-4 rounded-xl border border-yellow-400 bg-yellow-400/20 text-center animate-pulse`;
+                text.className = `text-yellow-400 font-black tracking-widest uppercase text-lg`;
+                text.innerText = `🏆 ${gameState.winner} WINS! 🏆`;
+                instructionStatus.innerText = "Game Over";
+                manualRollBtn.disabled = true;
+                manualRollBtn.classList.add('opacity-50');
+                return;
+            }
+
+            const isHuman = gameState.playerTypes[gameState.currentPlayer] === 'human';
+
+            const uiThemes = {
+                red: { border: 'border-red-500/30', bg: 'bg-red-500/10', text: 'text-red-400' },
+                green: { border: 'border-green-500/30', bg: 'bg-green-500/10', text: 'text-green-400' },
+                yellow: { border: 'border-yellow-400/30', bg: 'bg-yellow-400/10', text: 'text-yellow-400' },
+                blue: { border: 'border-blue-500/30', bg: 'bg-blue-500/10', text: 'text-blue-400' }
+            };
+
+            const theme = uiThemes[gameState.currentPlayer];
+            banner.className = `w-full max-w-md mb-4 py-2 px-4 rounded-xl border ${theme.border} ${theme.bg} text-center transition-colors duration-500`;
+            text.className = `${theme.text} font-bold tracking-widest uppercase text-sm`;
+            text.innerText = isHuman ? `Your Turn (${gameState.currentPlayer})` : `Bot Turn (${gameState.currentPlayer})`;
+            
+            // UI Instructions based on player type
+            if (isHuman) {
+                if (gameState.hasRolled) instructionStatus.innerText = "Action: Hold 1-4 fingers";
+                else instructionStatus.innerText = "Action: Pinch to Roll";
+                
+                manualRollBtn.disabled = gameState.hasRolled;
+                if(gameState.hasRolled) manualRollBtn.classList.add('opacity-50');
+                else manualRollBtn.classList.remove('opacity-50');
+            } else {
+                instructionStatus.innerText = "Bot is thinking...";
+                manualRollBtn.disabled = true;
+                manualRollBtn.classList.add('opacity-50');
+                
+                // --- BOT AI TRIGGER ---
+                if (!gameState.hasRolled) {
+                    setTimeout(() => {
+                        window.triggerDiceRoll();
+                    }, 1200);
+                }
+            }
+        }
+
+        // 5. Global Dice Roller & Simple AI Selection Logic
+        window.triggerDiceRoll = function() {
+            if (gameState.hasRolled || gameState.winner) return;
+            
+            const diceCube = document.getElementById('dice-cube');
+            const diceResult = document.getElementById('dice-result');
+            
+            diceCube.style.transition = 'none';
+            diceCube.style.transform = ''; 
+            diceCube.classList.add('rolling');
+            diceResult.innerText = "Rolling...";
+            diceResult.classList.replace('text-yellow-400', 'text-emerald-400');
+            
+            setTimeout(() => {
+                const roll = Math.floor(Math.random() * 6) + 1;
+                
+                diceCube.classList.remove('rolling');
+                diceCube.style.transition = 'transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
+                
+                let rx = 0, ry = 0;
+                switch(roll) {
+                    case 1: rx = 0; ry = 0; break;
+                    case 2: rx = -90; ry = 0; break;
+                    case 3: rx = 0; ry = -90; break;
+                    case 4: rx = 0; ry = 90; break;
+                    case 5: rx = 90; ry = 0; break;
+                    case 6: rx = 180; ry = 0; break;
+                }
+                
+                const extraSpinsX = 720 * (Math.random() > 0.5 ? 1 : -1);
+                const extraSpinsY = 720 * (Math.random() > 0.5 ? 1 : -1);
+                diceCube.style.transform = `translateZ(-40px) rotateX(${rx + extraSpinsX}deg) rotateY(${ry + extraSpinsY}deg)`;
+                
+                diceResult.innerText = `Rolled a ${roll}!`;
+                
+                gameState.currentRoll = roll;
+                gameState.hasRolled = true;
+                
+                const isHuman = gameState.playerTypes[gameState.currentPlayer] === 'human';
+
+                // Get all legally movable tokens
+                const validTokens = gameState.tokens[gameState.currentPlayer].filter(t => {
+                    if (t.state === 'home' && roll === 6) return true;
+                    if (t.state === 'active' && t.pos + roll <= 56) return true;
+                    return false;
+                });
+
+                if (validTokens.length === 0) {
+                    const allAtHome = gameState.tokens[gameState.currentPlayer].every(t => t.state === 'home' || t.state === 'finished');
+                    if (allAtHome && roll !== 6) {
+                        diceResult.innerText += " (Need a 6!)";
+                    } else {
+                        diceResult.innerText += " (No valid moves!)";
+                    }
+                    
+                    setTimeout(() => {
+                        if (!gameState.winner) {
+                            const currentIdx = gameState.turnOrder.indexOf(gameState.currentPlayer);
+                            gameState.currentPlayer = gameState.turnOrder[(currentIdx + 1) % gameState.turnOrder.length];
+                            gameState.hasRolled = false;
+                            updateGameUI();
+                            renderTokens();
+                        }
+                    }, 1800);
+                } 
+                else if (isHuman && validTokens.length === 1 && roll !== 6) {
+                    // Auto-Move logic for HUMAN
+                    diceResult.innerText += " (Auto-moving...)";
+                    setTimeout(() => {
+                        if (gameState.hasRolled && gameState.currentRoll === roll && !gameState.winner) {
+                            handleTokenMove(gameState.currentPlayer, validTokens[0].id);
+                        }
+                    }, 1500); 
+                }
+                else if (!isHuman) {
+                    // --- BOT AI TOKEN SELECTION ---
+                    diceResult.innerText += " (Bot deciding...)";
+                    setTimeout(() => {
+                        if (gameState.hasRolled && gameState.currentRoll === roll && !gameState.winner) {
+                            // Smart logic: If roll is 6, prioritize bringing a token out of the base
+                            let chosenToken = validTokens[0]; 
+                            if (roll === 6) {
+                                const homeToken = validTokens.find(t => t.state === 'home');
+                                if (homeToken) chosenToken = homeToken;
+                            } else {
+                                // Otherwise pick a random valid piece to move
+                                chosenToken = validTokens[Math.floor(Math.random() * validTokens.length)];
+                            }
+                            handleTokenMove(gameState.currentPlayer, chosenToken.id);
+                        }
+                    }, 1500); 
+                }
+                
+                updateGameUI();
+                renderTokens();
+                
+            }, 600); 
+        }
+
+        // 6. MediaPipe & Webcam Logic
+        const HAND_CONNECTIONS = [
+            [0,1],[1,2],[2,3],[3,4], [0,5],[5,6],[6,7],[7,8],
+            [5,9],[9,10],[10,11],[11,12], [9,13],[13,14],[14,15],[15,16],
+            [13,17],[17,18],[18,19],[19,20], [0,17]
+        ];
+
+        function getFingerCount(landmarks) {
+            let count = 0;
+            if (landmarks[8].y < landmarks[6].y) count++;   
+            if (landmarks[12].y < landmarks[10].y) count++; 
+            if (landmarks[16].y < landmarks[14].y) count++; 
+            if (landmarks[20].y < landmarks[18].y) count++; 
+            return count;
+        }
+
+        async function initializeHandTracking() {
+            try {
+                const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
+                handLandmarker = await HandLandmarker.createFromOptions(vision, {
+                    baseOptions: {
+                        modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task",
+                        delegate: "GPU"
+                    },
+                    runningMode: "VIDEO",
+                    numHands: 1
+                });
+                loadingSpinner.classList.add('hidden');
+                systemStatusText.innerText = "Engine Ready";
+                enableWebcamButton.disabled = false;
+                pinchStatus.innerText = "Ready. Start Webcam.";
+            } catch (error) {
+                systemStatusText.innerText = "Error Loading Model";
+                console.error(error);
+            }
+        }
+
+        enableWebcamButton.addEventListener("click", () => {
+            if (!handLandmarker) return;
+            webcamRunning = !webcamRunning;
+            if (webcamRunning) {
+                enableWebcamButton.innerHTML = `<i class="fa-solid fa-square"></i> <span>Stop Webcam</span>`;
+                enableWebcamButton.classList.replace('bg-emerald-500', 'bg-rose-500');
+                
+                navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }).then((stream) => {
+                    video.srcObject = stream;
+                    video.addEventListener("loadeddata", predictWebcam);
+                });
+            } else {
+                enableWebcamButton.innerHTML = `<i class="fa-solid fa-video"></i> <span>Start Webcam</span>`;
+                enableWebcamButton.classList.replace('bg-rose-500', 'bg-emerald-500');
+                video.srcObject.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                pinchStatus.innerText = "Offline";
+            }
+        });
+
+        async function predictWebcam() {
+            if (canvasElement.width !== video.videoWidth) {
+                canvasElement.width = video.videoWidth;
+                canvasElement.height = video.videoHeight;
+            }
+
+            if (webcamRunning && !gameState.winner) {
+                let startTimeMs = performance.now();
+                if (lastVideoTime !== video.currentTime) {
+                    lastVideoTime = video.currentTime;
+                    const results = handLandmarker.detectForVideo(video, startTimeMs);
+                    
+                    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                    
+                    if (results.landmarks && results.landmarks.length > 0) {
+                        const landmarks = results.landmarks[0];
+                        drawHand(landmarks);
+                        
+                        // Only process gestures if it's the HUMAN's turn
+                        const isHuman = gameState.playerTypes[gameState.currentPlayer] === 'human';
+                        
+                        if (isHuman) {
+                            if (!gameState.hasRolled) {
+                                // DICE ROLL GESTURE
+                                const thumbTip = landmarks[4];
+                                const indexTip = landmarks[8];
+                                const dist = Math.sqrt(Math.pow(thumbTip.x - indexTip.x, 2) + Math.pow(thumbTip.y - indexTip.y, 2));
+                                
+                                if (dist < 0.05) {
+                                    isPinched = true;
+                                    pinchStatus.innerText = "Pinched!";
+                                    pinchStatus.className = 'text-yellow-400 font-bold';
+                                } else if (isPinched && dist > 0.08) {
+                                    isPinched = false;
+                                    pinchStatus.innerText = "Open";
+                                    pinchStatus.className = 'text-emerald-400';
+                                    
+                                    const now = Date.now();
+                                    if (now - lastRollTime > 1500) { 
+                                        window.triggerDiceRoll();
+                                        lastRollTime = now;
+                                    }
+                                }
+                            } else {
+                                // TOKEN SELECTION GESTURE
+                                const fingers = getFingerCount(landmarks);
+                                
+                                if (fingers >= 1 && fingers <= 4) {
+                                    const tokenId = fingers - 1; 
+                                    const token = gameState.tokens[gameState.currentPlayer].find(t => t.id === tokenId);
+                                    
+                                    let isValid = false;
+                                    if (token && token.state === 'home' && gameState.currentRoll === 6) isValid = true;
+                                    if (token && token.state === 'active' && token.pos + gameState.currentRoll <= 56) isValid = true;
+                                    
+                                    if (isValid) {
+                                        if (detectedFingers === fingers) {
+                                            const holdTime = Date.now() - fingerHoldStartTime;
+                                            const percentage = Math.min(100, Math.floor((holdTime / 1000) * 100));
+                                            
+                                            pinchStatus.innerText = `Selecting Token ${fingers}... (${percentage}%)`;
+                                            pinchStatus.className = 'text-yellow-400 font-bold';
+                                            
+                                            if (holdTime >= 1000) { 
+                                                handleTokenMove(gameState.currentPlayer, tokenId);
+                                                detectedFingers = 0;
+                                                pinchStatus.innerText = "Moved!";
+                                            }
+                                        } else {
+                                            detectedFingers = fingers;
+                                            fingerHoldStartTime = Date.now();
+                                        }
+                                    } else {
+                                        detectedFingers = 0;
+                                        pinchStatus.innerText = `Token ${fingers} cannot move`;
+                                        pinchStatus.className = 'text-red-400';
+                                    }
+                                } else {
+                                    detectedFingers = 0;
+                                    pinchStatus.innerText = "Waiting for fingers...";
+                                    pinchStatus.className = 'text-emerald-400';
+                                }
+                            }
+                        } else {
+                            pinchStatus.innerText = "Bot is playing...";
+                            pinchStatus.className = 'text-slate-500';
+                        }
+                    } else {
+                        detectedFingers = 0;
+                        pinchStatus.innerText = "No Hand Detected";
+                        pinchStatus.className = 'text-slate-500';
+                    }
+                }
+                window.requestAnimationFrame(predictWebcam);
+            } else if (gameState.winner) {
+                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                pinchStatus.innerText = "Game Over";
+            }
+        }
+
+        function drawHand(landmarks) {
+            canvasCtx.strokeStyle = '#10b981';
+            canvasCtx.lineWidth = 4;
+            for (const connection of HAND_CONNECTIONS) {
+                canvasCtx.beginPath();
+                canvasCtx.moveTo(landmarks[connection[0]].x * canvasElement.width, landmarks[connection[0]].y * canvasElement.height);
+                canvasCtx.lineTo(landmarks[connection[1]].x * canvasElement.width, landmarks[connection[1]].y * canvasElement.height);
+                canvasCtx.stroke();
+            }
+            canvasCtx.fillStyle = '#f8fafc';
+            for (const point of landmarks) {
+                canvasCtx.beginPath();
+                canvasCtx.arc(point.x * canvasElement.width, point.y * canvasElement.height, 5, 0, 2 * Math.PI);
+                canvasCtx.fill();
+            }
+        }
+    </script>
+</body>
+</html>
