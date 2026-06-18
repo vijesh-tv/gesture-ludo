@@ -89,14 +89,8 @@
             position: relative;
             transform-style: preserve-3d;
             transform: translateZ(-40px) rotateX(-15deg) rotateY(15deg);
-            transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        .cube.rolling {
-            animation: spinDice 0.5s linear infinite;
-        }
-        @keyframes spinDice {
-            0% { transform: translateZ(-40px) rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
-            100% { transform: translateZ(-40px) rotateX(720deg) rotateY(1080deg) rotateZ(360deg); }
+            /* We handle smooth continuous rolling via JS transition directly */
+            transition: transform 1.2s cubic-bezier(0.1, 0.9, 0.2, 1);
         }
         .cube-face {
             position: absolute;
@@ -128,6 +122,32 @@
         .left   { transform: rotateY(-90deg) translateZ(40px); }
         .top    { transform: rotateX( 90deg) translateZ(40px); }
         .bottom { transform: rotateX(-90deg) translateZ(40px); }
+
+        /* Custom Attention Blinking for Turns */
+        @keyframes blinkAttention {
+            0%, 100% { 
+                box-shadow: 0 0 0px transparent, inset 0 0 0px transparent;
+                transform: scale(1); 
+            }
+            50% { 
+                box-shadow: 0 0 25px var(--blink-glow), inset 0 0 15px var(--blink-glow);
+                transform: scale(1.03); 
+            }
+        }
+        .animate-blink-4 {
+            animation: blinkAttention 0.6s ease-in-out 4;
+        }
+
+        /* NEW: Token Hop Animation */
+        @keyframes hopAnimation {
+            0% { transform: scale(1) translateY(0); }
+            40% { transform: scale(1.15) translateY(-6px); box-shadow: 0 6px 10px rgba(0,0,0,0.4); z-index: 50; }
+            100% { transform: scale(1) translateY(0); }
+        }
+        .animate-hop {
+            animation: hopAnimation 0.3s ease-in-out forwards;
+            z-index: 50;
+        }
     </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
@@ -197,6 +217,11 @@
                         <video id="webcam" class="w-full h-full object-cover" autoplay playsinline></video>
                         <canvas id="output_canvas"></canvas>
                     </div>
+                    
+                    <!-- NEW: Camera Overlay for Tutorial -->
+                    <div id="camera-overlay" class="absolute z-30 bottom-6 left-0 right-0 mx-auto w-11/12 bg-black/80 text-yellow-400 font-bold text-center py-3 px-4 rounded-xl opacity-0 transition-opacity duration-500 pointer-events-none shadow-lg border border-yellow-400/30">
+                        Raise your fingers (1-4) to pick which coin to move.
+                    </div>
                 </div>
 
                 <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4 shadow-md">
@@ -210,7 +235,12 @@
                     </div>
                 </div>
 
-                <!-- NEW: Dice Roller Area (Moved to Left Column) -->
+                <!-- TURN INDICATOR (Moved above Dice) -->
+                <div id="turn-banner" class="w-full mb-2 py-2 px-4 rounded-xl border border-slate-500/30 bg-slate-500/10 text-center transition-colors duration-500">
+                    <h2 class="text-slate-400 font-bold tracking-widest uppercase text-sm" id="turn-text">Initializing...</h2>
+                </div>
+
+                <!-- Dice Roller Area (Moved to Left Column) -->
                 <div class="w-full bg-slate-950 rounded-2xl border border-slate-800 p-4 flex flex-col xl:flex-row items-center justify-between shadow-inner gap-4">
                     <div class="flex items-center gap-4">
                         <div id="dice-container" class="scene shrink-0">
@@ -238,11 +268,6 @@
             <!-- RIGHT COLUMN: Ludo Board ONLY (60%) -->
             <div class="w-full md:w-[60%] flex flex-col items-center justify-center bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative">
                 
-                <!-- TURN INDICATOR -->
-                <div id="turn-banner" class="w-full max-w-md mb-4 py-2 px-4 rounded-xl border border-slate-500/30 bg-slate-500/10 text-center transition-colors duration-500">
-                    <h2 class="text-slate-400 font-bold tracking-widest uppercase text-sm" id="turn-text">Initializing...</h2>
-                </div>
-
                 <!-- Dynamic CSS Grid Ludo Board -->
                 <div id="ludo-board" class="shadow-2xl">
                     <!-- JavaScript will populate the 225 grid cells and tokens here -->
@@ -272,9 +297,14 @@
         let isPinched = false;
         let lastRollTime = 0;
         
+        // NEW: Track persistent dice rotation so it never snaps backwards
+        let currentDiceX = -15;
+        let currentDiceY = 15;
+        
         // Gesture Selection State
         let detectedFingers = 0;
         let fingerHoldStartTime = 0;
+        let hasShownFingerTutorial = false; // NEW: Track if tutorial was shown
 
         // --- LUDO GAME LOGIC & STATE ---
 
@@ -308,10 +338,13 @@
         const gameState = {
             winner: null,
             currentPlayer: 'red',
-            turnOrder: [], // Will be set to 2 players during selection
+            turnOrder: [], 
             playerTypes: {},
             currentRoll: 0,
             hasRolled: false,
+            isNewTurn: true, 
+            isAnimating: false, // NEW: Animation Lock Flag
+            animatingToken: null, // NEW: Tracks which token is hopping
             tokens: {
                 red:    [ {id:0, state:'home', pos:-1}, {id:1, state:'home', pos:-1}, {id:2, state:'home', pos:-1}, {id:3, state:'home', pos:-1} ],
                 green:  [ {id:0, state:'home', pos:-1}, {id:1, state:'home', pos:-1}, {id:2, state:'home', pos:-1}, {id:3, state:'home', pos:-1} ],
@@ -337,6 +370,7 @@
             // Only 2 players in the game now
             gameState.turnOrder = [chosenColor, botColor];
             gameState.currentPlayer = chosenColor; // Human starts first!
+            gameState.isNewTurn = true; // Ensure blink happens at start
 
             // Remove tokens for the unused colors so they don't render
             ['red', 'green', 'yellow', 'blue'].forEach(c => {
@@ -446,10 +480,16 @@
                     tokenEl.innerText = token.id + 1; 
                     
                     let isClickable = false;
-                    // Only pulse if it's the Human's turn
-                    if (gameState.hasRolled && color === gameState.currentPlayer && !gameState.winner && gameState.playerTypes[color] === 'human') {
+                    // Only pulse if it's the Human's turn and NOT currently animating
+                    if (gameState.hasRolled && color === gameState.currentPlayer && !gameState.winner && gameState.playerTypes[color] === 'human' && !gameState.isAnimating) {
                         if (token.state === 'home' && gameState.currentRoll === 6) isClickable = true;
                         if (token.state === 'active' && token.pos + gameState.currentRoll <= 56) isClickable = true;
+                    }
+
+                    // NEW: Add the hopping animation class if this specific token is moving
+                    if (gameState.isAnimating && gameState.animatingToken && gameState.animatingToken.color === color && gameState.animatingToken.id === token.id) {
+                        tokenEl.classList.add('animate-hop');
+                        isClickable = false; // Prevent clicks while it is jumping
                     }
                     
                     if (isClickable) {
@@ -486,18 +526,58 @@
 
         // 3. Token Move Logic & Capturing Rules
         function handleTokenMove(color, tokenId) {
-            if (gameState.winner) return;
+            if (gameState.winner || gameState.isAnimating) return;
+
+            // Hide the overlay if it's currently showing
+            const overlay = document.getElementById('camera-overlay');
+            if (overlay && overlay.classList.contains('opacity-100')) {
+                overlay.classList.replace('opacity-100', 'opacity-0');
+            }
 
             const token = gameState.tokens[color].find(t => t.id === tokenId);
-            let bonusTurn = false;
             
+            // NEW: Divert logic into the step-by-step animator
             if (token.state === 'home' && gameState.currentRoll === 6) {
-                token.state = 'active';
-                token.pos = 0;
+                animateMove(color, token, 1, true); // 1 hop out of home
             } 
             else if (token.state === 'active') {
-                token.pos += gameState.currentRoll;
+                animateMove(color, token, gameState.currentRoll, false); // Hop the dice roll amount
+            }
+        }
+
+        // NEW: Step-by-Step Animation Loop
+        function animateMove(color, token, steps, isExitingHome) {
+            gameState.isAnimating = true;
+            gameState.animatingToken = { color: color, id: token.id };
+            let currentStep = 0;
+
+            updateGameUI(); // Lock the UI immediately
+            
+            const hopInterval = setInterval(() => {
+                currentStep++;
                 
+                if (isExitingHome && currentStep === 1) {
+                    token.state = 'active';
+                    token.pos = 0;
+                } else {
+                    token.pos++;
+                }
+                
+                renderTokens(); // Triggers the CSS hop keyframe
+
+                if (currentStep >= steps) {
+                    clearInterval(hopInterval);
+                    gameState.animatingToken = null;
+                    finalizeMove(color, token); // Movement finished, apply rules
+                }
+            }, 300); // 300ms matches our CSS animation duration
+        }
+
+        // NEW: Resolve Ludo Rules after animation finishes
+        function finalizeMove(color, token) {
+            let bonusTurn = false;
+            
+            if (token.state === 'active') {
                 if (token.pos === 56) {
                     token.state = 'finished';
                     bonusTurn = true;
@@ -540,6 +620,7 @@
                 const hexColors = {red: '#ff0000', green: '#00a200', blue: '#0078d7', yellow: '#ffe400'};
                 document.getElementById('ludo-board').style.boxShadow = `0 0 50px ${hexColors[color]}`;
                 
+                gameState.isAnimating = false;
                 updateGameUI();
                 renderTokens();
                 return;
@@ -549,10 +630,11 @@
             
             if (gameState.currentRoll !== 6 && !bonusTurn) {
                 const currentIdx = gameState.turnOrder.indexOf(gameState.currentPlayer);
-                // Use dynamic turnOrder.length to cycle correctly between the 2 active players
                 gameState.currentPlayer = gameState.turnOrder[(currentIdx + 1) % gameState.turnOrder.length];
+                gameState.isNewTurn = true; 
             }
             
+            gameState.isAnimating = false;
             updateGameUI();
             renderTokens();
         }
@@ -564,7 +646,7 @@
             const instructionStatus = document.getElementById('instruction-status');
             
             if (gameState.winner) {
-                banner.className = `w-full max-w-md mb-4 py-2 px-4 rounded-xl border border-yellow-400 bg-yellow-400/20 text-center animate-pulse`;
+                banner.className = `w-full mb-2 py-2 px-4 rounded-xl border border-yellow-400 bg-yellow-400/20 text-center animate-pulse`;
                 text.className = `text-yellow-400 font-black tracking-widest uppercase text-lg`;
                 text.innerText = `🏆 ${gameState.winner} WINS! 🏆`;
                 instructionStatus.innerText = "Game Over";
@@ -573,19 +655,38 @@
                 return;
             }
 
+            // NEW: Override UI entirely if an animation is currently playing
+            if (gameState.isAnimating) {
+                instructionStatus.innerText = "Piece is moving...";
+                manualRollBtn.disabled = true;
+                manualRollBtn.classList.add('opacity-50');
+                return;
+            }
+
             const isHuman = gameState.playerTypes[gameState.currentPlayer] === 'human';
 
             const uiThemes = {
-                red: { border: 'border-red-500/30', bg: 'bg-red-500/10', text: 'text-red-400' },
-                green: { border: 'border-green-500/30', bg: 'bg-green-500/10', text: 'text-green-400' },
-                yellow: { border: 'border-yellow-400/30', bg: 'bg-yellow-400/10', text: 'text-yellow-400' },
-                blue: { border: 'border-blue-500/30', bg: 'bg-blue-500/10', text: 'text-blue-400' }
+                red: { border: 'border-red-500/30', bg: 'bg-red-500/10', text: 'text-red-400', glow: 'rgba(239, 68, 68, 0.8)' },
+                green: { border: 'border-green-500/30', bg: 'bg-green-500/10', text: 'text-green-400', glow: 'rgba(34, 197, 94, 0.8)' },
+                yellow: { border: 'border-yellow-400/30', bg: 'bg-yellow-400/10', text: 'text-yellow-400', glow: 'rgba(234, 179, 8, 0.8)' },
+                blue: { border: 'border-blue-500/30', bg: 'bg-blue-500/10', text: 'text-blue-400', glow: 'rgba(59, 130, 246, 0.8)' }
             };
 
             const theme = uiThemes[gameState.currentPlayer];
-            banner.className = `w-full max-w-md mb-4 py-2 px-4 rounded-xl border ${theme.border} ${theme.bg} text-center transition-colors duration-500`;
+            
+            // Reapply basic theme styling
+            banner.className = `w-full mb-2 py-2 px-4 rounded-xl border ${theme.border} ${theme.bg} text-center transition-colors duration-500`;
+            banner.style.setProperty('--blink-glow', theme.glow);
             text.className = `${theme.text} font-bold tracking-widest uppercase text-sm`;
             text.innerText = isHuman ? `Your Turn (${gameState.currentPlayer})` : `Bot Turn (${gameState.currentPlayer})`;
+            
+            // --- NEW: Add blink animation if it is a new turn for the human ---
+            if (isHuman && gameState.isNewTurn) {
+                banner.classList.remove('animate-blink-4'); // Reset
+                void banner.offsetWidth; // Trigger DOM reflow to restart animation reliably
+                banner.classList.add('animate-blink-4');
+                gameState.isNewTurn = false; // Consume flag
+            }
             
             // UI Instructions based on player type
             if (isHuman) {
@@ -603,7 +704,7 @@
                 // --- BOT AI TRIGGER ---
                 if (!gameState.hasRolled) {
                     setTimeout(() => {
-                        window.triggerDiceRoll();
+                        if (!gameState.isAnimating) window.triggerDiceRoll(); // Verify no animation lock
                     }, 1200);
                 }
             }
@@ -611,37 +712,38 @@
 
         // 5. Global Dice Roller & Simple AI Selection Logic
         window.triggerDiceRoll = function() {
-            if (gameState.hasRolled || gameState.winner) return;
+            if (gameState.hasRolled || gameState.winner || gameState.isAnimating) return;
             
             const diceCube = document.getElementById('dice-cube');
             const diceResult = document.getElementById('dice-result');
             
-            diceCube.style.transition = 'none';
-            diceCube.style.transform = ''; 
-            diceCube.classList.add('rolling');
             diceResult.innerText = "Rolling...";
             diceResult.classList.replace('text-yellow-400', 'text-emerald-400');
             
+            const roll = Math.floor(Math.random() * 6) + 1;
+            
+            let rx = 0, ry = 0;
+            switch(roll) {
+                case 1: rx = 0; ry = 0; break;
+                case 2: rx = -90; ry = 0; break;
+                case 3: rx = 0; ry = -90; break;
+                case 4: rx = 0; ry = 90; break;
+                case 5: rx = 90; ry = 0; break;
+                case 6: rx = 180; ry = 0; break;
+            }
+            
+            // Normalize current rotation to the nearest 360 loop
+            const nearestX = Math.round(currentDiceX / 360) * 360;
+            const nearestY = Math.round(currentDiceY / 360) * 360;
+            
+            // Add exactly 2 full spins (720 deg) PLUS the specific face offset
+            currentDiceX = nearestX + 720 + rx;
+            currentDiceY = nearestY + 720 + ry;
+            
+            // Fire the smooth CSS transition using the new accumulated rotation values
+            diceCube.style.transform = `translateZ(-40px) rotateX(${currentDiceX}deg) rotateY(${currentDiceY}deg)`;
+            
             setTimeout(() => {
-                const roll = Math.floor(Math.random() * 6) + 1;
-                
-                diceCube.classList.remove('rolling');
-                diceCube.style.transition = 'transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275)';
-                
-                let rx = 0, ry = 0;
-                switch(roll) {
-                    case 1: rx = 0; ry = 0; break;
-                    case 2: rx = -90; ry = 0; break;
-                    case 3: rx = 0; ry = -90; break;
-                    case 4: rx = 0; ry = 90; break;
-                    case 5: rx = 90; ry = 0; break;
-                    case 6: rx = 180; ry = 0; break;
-                }
-                
-                const extraSpinsX = 720 * (Math.random() > 0.5 ? 1 : -1);
-                const extraSpinsY = 720 * (Math.random() > 0.5 ? 1 : -1);
-                diceCube.style.transform = `translateZ(-40px) rotateX(${rx + extraSpinsX}deg) rotateY(${ry + extraSpinsY}deg)`;
-                
                 diceResult.innerText = `Rolled a ${roll}!`;
                 
                 gameState.currentRoll = roll;
@@ -666,9 +768,11 @@
                     
                     setTimeout(() => {
                         if (!gameState.winner) {
+                            diceResult.innerText = "Ready to play...";
                             const currentIdx = gameState.turnOrder.indexOf(gameState.currentPlayer);
                             gameState.currentPlayer = gameState.turnOrder[(currentIdx + 1) % gameState.turnOrder.length];
                             gameState.hasRolled = false;
+                            gameState.isNewTurn = true; // Signal turn change
                             updateGameUI();
                             renderTokens();
                         }
@@ -679,15 +783,33 @@
                     diceResult.innerText += " (Auto-moving...)";
                     setTimeout(() => {
                         if (gameState.hasRolled && gameState.currentRoll === roll && !gameState.winner) {
+                            diceResult.innerText = `Rolled a ${roll}!`;
                             handleTokenMove(gameState.currentPlayer, validTokens[0].id);
                         }
                     }, 1500); 
+                }
+                else if (isHuman) {
+                    // NEW: Show tutorial overlay on first 6 rolled
+                    if (roll === 6 && !hasShownFingerTutorial) {
+                        const overlay = document.getElementById('camera-overlay');
+                        if (overlay) {
+                            overlay.classList.replace('opacity-0', 'opacity-100');
+                            hasShownFingerTutorial = true;
+                            
+                            // Auto-hide after 5 seconds just in case they don't move immediately
+                            setTimeout(() => {
+                                overlay.classList.replace('opacity-100', 'opacity-0');
+                            }, 5000);
+                        }
+                    }
                 }
                 else if (!isHuman) {
                     // --- BOT AI TOKEN SELECTION ---
                     diceResult.innerText += " (Bot deciding...)";
                     setTimeout(() => {
                         if (gameState.hasRolled && gameState.currentRoll === roll && !gameState.winner) {
+                            diceResult.innerText = `Rolled a ${roll}!`;
+                            
                             // Smart logic: If roll is 6, prioritize bringing a token out of the base
                             let chosenToken = validTokens[0]; 
                             if (roll === 6) {
@@ -705,7 +827,7 @@
                 updateGameUI();
                 renderTokens();
                 
-            }, 600); 
+            }, 1200); // NEW: Matches exactly with the 1.2s CSS transition time
         }
 
         // 6. MediaPipe & Webcam Logic
@@ -772,7 +894,8 @@
                 canvasElement.height = video.videoHeight;
             }
 
-            if (webcamRunning && !gameState.winner) {
+            // Lock gesture inputs if game is over OR if a piece is currently hopping
+            if (webcamRunning && !gameState.winner && !gameState.isAnimating) {
                 let startTimeMs = performance.now();
                 if (lastVideoTime !== video.currentTime) {
                     lastVideoTime = video.currentTime;
