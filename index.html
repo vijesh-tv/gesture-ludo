@@ -21,7 +21,8 @@
             grid-template-rows: repeat(15, 1fr);
             aspect-ratio: 1 / 1;
             width: 100%;
-            max-width: 600px;
+            max-width: min(100%, calc(100vh - 8rem));
+            max-height: 100%;
             margin: 0 auto;
             border: 4px solid #1e293b;
             background-color: #f8fafc;
@@ -89,7 +90,6 @@
             position: relative;
             transform-style: preserve-3d;
             transform: translateZ(-40px) rotateX(-15deg) rotateY(15deg);
-            /* We handle smooth continuous rolling via JS transition directly */
             transition: transform 1.2s cubic-bezier(0.1, 0.9, 0.2, 1);
         }
         .cube-face {
@@ -138,7 +138,7 @@
             animation: blinkAttention 0.6s ease-in-out 4;
         }
 
-        /* NEW: Token Hop Animation */
+        /* Token Hop Animation */
         @keyframes hopAnimation {
             0% { transform: scale(1) translateY(0); }
             40% { transform: scale(1.15) translateY(-6px); box-shadow: 0 6px 10px rgba(0,0,0,0.4); z-index: 50; }
@@ -150,10 +150,10 @@
         }
     </style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col font-sans">
+<body class="bg-slate-950 text-slate-100 h-screen flex flex-col font-sans overflow-x-hidden md:overflow-hidden">
 
     <!-- Header -->
-    <header class="border-b border-slate-900 bg-slate-900/50 px-6 py-4">
+    <header class="border-b border-slate-900 bg-slate-900/50 px-6 py-3 shrink-0">
         <div class="max-w-[1600px] mx-auto flex items-center gap-3">
             <div class="p-2.5 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl text-slate-950 font-bold">
                 <i class="fa-solid fa-robot text-xl"></i>
@@ -171,30 +171,26 @@
     </header>
 
     <!-- App Container -->
-    <main class="flex-grow max-w-[1600px] w-full mx-auto p-4 flex flex-col justify-center">
+    <main class="flex-grow max-w-[1600px] w-full mx-auto p-3 lg:p-4 flex flex-col min-h-0 overflow-y-auto md:overflow-y-hidden">
         
         <!-- COLOR SELECTION SCREEN -->
-        <div id="selection-screen" class="flex flex-col items-center justify-center py-12 px-4 w-full max-w-3xl mx-auto text-center">
+        <div id="selection-screen" class="flex flex-col items-center justify-center py-12 px-4 w-full h-full max-w-3xl mx-auto text-center overflow-y-auto">
             <h2 class="text-3xl md:text-4xl font-black text-slate-100 mb-2">Pick Your Team</h2>
             <p class="text-slate-400 mb-10">You will play as this color against 1 computer-controlled Bot.</p>
             
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 w-full">
-                <!-- Red Button -->
                 <button onclick="startGame('red')" class="group p-6 rounded-2xl border-2 border-slate-800 hover:border-red-500 bg-slate-900 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(239,68,68,0.3)] flex flex-col items-center gap-4">
                     <div class="w-16 h-16 rounded-full token-red shadow-lg border-2 border-white/80 group-hover:animate-bounce"></div>
                     <span class="text-red-400 font-bold tracking-widest">RED</span>
                 </button>
-                <!-- Green Button -->
                 <button onclick="startGame('green')" class="group p-6 rounded-2xl border-2 border-slate-800 hover:border-green-500 bg-slate-900 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(34,197,94,0.3)] flex flex-col items-center gap-4">
                     <div class="w-16 h-16 rounded-full token-green shadow-lg border-2 border-white/80 group-hover:animate-bounce"></div>
                     <span class="text-green-400 font-bold tracking-widest">GREEN</span>
                 </button>
-                <!-- Yellow Button -->
                 <button onclick="startGame('yellow')" class="group p-6 rounded-2xl border-2 border-slate-800 hover:border-yellow-400 bg-slate-900 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(234,179,8,0.3)] flex flex-col items-center gap-4">
                     <div class="w-16 h-16 rounded-full token-yellow shadow-lg border-2 border-white/80 group-hover:animate-bounce"></div>
                     <span class="text-yellow-400 font-bold tracking-widest">YELLOW</span>
                 </button>
-                <!-- Blue Button -->
                 <button onclick="startGame('blue')" class="group p-6 rounded-2xl border-2 border-slate-800 hover:border-blue-500 bg-slate-900 transition-all hover:scale-105 hover:shadow-[0_0_20px_rgba(59,130,246,0.3)] flex flex-col items-center gap-4">
                     <div class="w-16 h-16 rounded-full token-blue shadow-lg border-2 border-white/80 group-hover:animate-bounce"></div>
                     <span class="text-blue-400 font-bold tracking-widest">BLUE</span>
@@ -202,13 +198,13 @@
             </div>
         </div>
 
-        <!-- GAME CONTAINER (Hidden until color is selected) -->
-        <div id="game-container" class="hidden flex-col md:flex-row gap-6 w-full h-full">
+        <!-- GAME CONTAINER -->
+        <div id="game-container" class="hidden flex-col md:flex-row gap-4 w-full h-full min-h-0">
             
-            <!-- LEFT COLUMN: Live Camera (40%) -->
-            <div class="w-full md:w-[40%] flex flex-col gap-4">
+            <!-- LEFT COLUMN: Live Camera (35-40%) -->
+            <div class="w-full md:w-[40%] lg:w-[35%] flex flex-col gap-3 h-full min-h-0">
                 
-                <div class="relative bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden aspect-[4/3] flex items-center justify-center shadow-xl">
+                <div class="relative bg-slate-900 rounded-2xl border border-slate-800 overflow-hidden min-h-[250px] md:min-h-0 flex-1 flex items-center justify-center shadow-xl">
                     <div id="loadingSpinner" class="absolute z-20 flex flex-col items-center gap-3">
                         <div class="w-10 h-10 border-4 border-slate-800 border-t-emerald-400 rounded-full animate-spin"></div>
                         <span class="text-sm text-emerald-400 font-semibold animate-pulse">Loading Hand Tracking...</span>
@@ -218,32 +214,29 @@
                         <canvas id="output_canvas"></canvas>
                     </div>
                     
-                    <!-- NEW: Camera Overlay for Tutorial -->
-                    <div id="camera-overlay" class="absolute z-30 bottom-6 left-0 right-0 mx-auto w-11/12 bg-black/80 text-yellow-400 font-bold text-center py-3 px-4 rounded-xl opacity-0 transition-opacity duration-500 pointer-events-none shadow-lg border border-yellow-400/30">
+                    <div id="camera-overlay" class="absolute z-30 bottom-4 left-0 right-0 mx-auto w-11/12 bg-black/80 text-yellow-400 font-bold text-center py-2 px-3 text-sm rounded-xl opacity-0 transition-opacity duration-500 pointer-events-none shadow-lg border border-yellow-400/30">
                         Raise your fingers (1-4) to pick which coin to move.
                     </div>
                 </div>
 
-                <div class="bg-slate-900 rounded-2xl border border-slate-800 p-4 shadow-md">
-                    <button id="webcamButton" disabled class="w-full px-5 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 mb-3">
+                <div class="bg-slate-900 rounded-2xl border border-slate-800 p-3 shadow-md shrink-0">
+                    <button id="webcamButton" disabled class="w-full px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl transition-all disabled:opacity-50 flex items-center justify-center gap-2 mb-2 text-sm">
                         <i class="fa-solid fa-video"></i>
                         <span>Start Webcam</span>
                     </button>
-                    <div class="flex justify-between text-xs text-slate-400 font-mono bg-slate-950 p-2 rounded-lg border border-slate-800">
+                    <div class="flex justify-between text-[10px] md:text-xs text-slate-400 font-mono bg-slate-950 p-2 rounded-lg border border-slate-800">
                         <span id="instruction-status">Action: Waiting for game...</span>
                         <span id="pinch-status" class="text-emerald-400">Offline</span>
                     </div>
                 </div>
 
-                <!-- TURN INDICATOR (Moved above Dice) -->
-                <div id="turn-banner" class="w-full mb-2 py-2 px-4 rounded-xl border border-slate-500/30 bg-slate-500/10 text-center transition-colors duration-500">
-                    <h2 class="text-slate-400 font-bold tracking-widest uppercase text-sm" id="turn-text">Initializing...</h2>
+                <div id="turn-banner" class="w-full mb-0 py-1.5 px-3 rounded-xl border border-slate-500/30 bg-slate-500/10 text-center transition-colors duration-500 shrink-0">
+                    <h2 class="text-slate-400 font-bold tracking-widest uppercase text-xs" id="turn-text">Initializing...</h2>
                 </div>
 
-                <!-- Dice Roller Area (Moved to Left Column) -->
-                <div class="w-full bg-slate-950 rounded-2xl border border-slate-800 p-4 flex flex-col xl:flex-row items-center justify-between shadow-inner gap-4">
-                    <div class="flex items-center gap-4">
-                        <div id="dice-container" class="scene shrink-0">
+                <div class="w-full bg-slate-950 rounded-2xl border border-slate-800 p-3 flex flex-col xl:flex-row items-start xl:items-center justify-between shadow-inner gap-3 shrink-0">
+                    <div class="flex items-center justify-start gap-4 w-full xl:w-auto">
+                        <div id="dice-container" class="scene shrink-0" style="transform: scale(0.9);">
                             <div class="cube" id="dice-cube">
                                 <div class="cube-face front"><span class="pip" style="grid-area: 2 / 2;"></span></div>
                                 <div class="cube-face top"><span class="pip" style="grid-area: 1 / 1;"></span><span class="pip" style="grid-area: 3 / 3;"></span></div>
@@ -254,25 +247,22 @@
                             </div>
                         </div>
                         <div>
-                            <h3 class="text-lg font-bold text-slate-200">Current Roll</h3>
-                            <p id="dice-result" class="text-sm text-emerald-400 tracking-wide font-mono">Ready to play...</p>
+                            <h3 class="text-base font-bold text-slate-200">Current Roll</h3>
+                            <p id="dice-result" class="text-xs md:text-sm text-emerald-400 tracking-wide font-mono">Ready to play...</p>
                         </div>
                     </div>
-                    <button onclick="triggerDiceRoll()" id="manualRollBtn" class="w-full xl:w-auto px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition-colors border border-slate-700 whitespace-nowrap">
+                    <button onclick="triggerDiceRoll()" id="manualRollBtn" class="w-full xl:w-auto px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg transition-colors border border-slate-700 whitespace-nowrap">
                         Manual Roll
                     </button>
                 </div>
 
             </div>
 
-            <!-- RIGHT COLUMN: Ludo Board ONLY (60%) -->
-            <div class="w-full md:w-[60%] flex flex-col items-center justify-center bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative">
-                
-                <!-- Dynamic CSS Grid Ludo Board -->
+            <!-- RIGHT COLUMN: Ludo Board ONLY (60-65%) -->
+            <div class="w-full md:flex-1 flex flex-col items-center justify-center bg-slate-900 border border-slate-800 rounded-2xl p-2 lg:p-6 shadow-xl relative min-h-0">
                 <div id="ludo-board" class="shadow-2xl">
                     <!-- JavaScript will populate the 225 grid cells and tokens here -->
                 </div>
-
             </div>
         </div>
     </main>
@@ -281,15 +271,14 @@
     <script type="module">
         import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
 
-        // DOM elements
+        // Safely map DOM elements (using defensive getters later to avoid null property errors)
         const video = document.getElementById('webcam');
         const canvasElement = document.getElementById('output_canvas');
-        const canvasCtx = canvasElement.getContext('2d');
+        const canvasCtx = canvasElement ? canvasElement.getContext('2d') : null;
         const enableWebcamButton = document.getElementById('webcamButton');
         const pinchStatus = document.getElementById('pinch-status');
         const loadingSpinner = document.getElementById('loadingSpinner');
         const systemStatusText = document.getElementById('system-status');
-        const manualRollBtn = document.getElementById('manualRollBtn');
 
         let handLandmarker;
         let webcamRunning = false;
@@ -297,17 +286,14 @@
         let isPinched = false;
         let lastRollTime = 0;
         
-        // NEW: Track persistent dice rotation so it never snaps backwards
         let currentDiceX = -15;
         let currentDiceY = 15;
         
-        // Gesture Selection State
         let detectedFingers = 0;
         let fingerHoldStartTime = 0;
-        let hasShownFingerTutorial = false; // NEW: Track if tutorial was shown
+        let hasShownFingerTutorial = false;
 
         // --- LUDO GAME LOGIC & STATE ---
-
         const MAIN_PATH = [
             [6,1],[6,2],[6,3],[6,4],[6,5], [5,6],[4,6],[3,6],[2,6],[1,6],[0,6],
             [0,7],[0,8], [1,8],[2,8],[3,8],[4,8],[5,8], [6,9],[6,10],[6,11],[6,12],[6,13],[6,14],
@@ -334,7 +320,6 @@
             return SAFE_ZONES.some(zone => zone[0] === r && zone[1] === c);
         }
 
-        // Default Game State
         const gameState = {
             winner: null,
             currentPlayer: 'red',
@@ -343,8 +328,8 @@
             currentRoll: 0,
             hasRolled: false,
             isNewTurn: true, 
-            isAnimating: false, // NEW: Animation Lock Flag
-            animatingToken: null, // NEW: Tracks which token is hopping
+            isAnimating: false, 
+            animatingToken: null,
             tokens: {
                 red:    [ {id:0, state:'home', pos:-1}, {id:1, state:'home', pos:-1}, {id:2, state:'home', pos:-1}, {id:3, state:'home', pos:-1} ],
                 green:  [ {id:0, state:'home', pos:-1}, {id:1, state:'home', pos:-1}, {id:2, state:'home', pos:-1}, {id:3, state:'home', pos:-1} ],
@@ -353,48 +338,44 @@
             }
         };
 
-        // --- LOBBY SELECTION LOGIC (1v1) ---
         window.startGame = function(chosenColor) {
-            // Assign opposite color as the bot to keep distance on the board
-            const opposites = {
-                'red': 'yellow',
-                'yellow': 'red',
-                'green': 'blue',
-                'blue': 'green'
-            };
+            const opposites = { 'red': 'yellow', 'yellow': 'red', 'green': 'blue', 'blue': 'green' };
             const botColor = opposites[chosenColor];
 
             gameState.playerTypes[chosenColor] = 'human';
             gameState.playerTypes[botColor] = 'bot';
             
-            // Only 2 players in the game now
             gameState.turnOrder = [chosenColor, botColor];
-            gameState.currentPlayer = chosenColor; // Human starts first!
-            gameState.isNewTurn = true; // Ensure blink happens at start
+            gameState.currentPlayer = chosenColor;
+            gameState.isNewTurn = true; 
 
-            // Remove tokens for the unused colors so they don't render
             ['red', 'green', 'yellow', 'blue'].forEach(c => {
                 if (c !== chosenColor && c !== botColor) {
                     gameState.tokens[c] = []; 
                 }
             });
 
-            document.getElementById('header-subtitle').innerText = `You are ${chosenColor.toUpperCase()}. The computer controls ${botColor.toUpperCase()}.`;
+            const subtitle = document.getElementById('header-subtitle');
+            if (subtitle) subtitle.innerText = `You are ${chosenColor.toUpperCase()}. The computer controls ${botColor.toUpperCase()}.`;
 
-            document.getElementById('selection-screen').classList.add('hidden');
-            document.getElementById('game-container').classList.remove('hidden');
-            document.getElementById('game-container').classList.add('flex');
+            const selectionScreen = document.getElementById('selection-screen');
+            const gameContainer = document.getElementById('game-container');
+            if (selectionScreen) selectionScreen.classList.add('hidden');
+            if (gameContainer) {
+                gameContainer.classList.remove('hidden');
+                gameContainer.classList.add('flex');
+            }
 
-            systemStatusText.innerText = "Initializing Engine...";
+            if (systemStatusText) systemStatusText.innerText = "Initializing Engine...";
             drawLudoBoard();
             updateGameUI();
             renderTokens();
             initializeHandTracking();
         }
 
-        // 1. Draw Ludo Board Function
         function drawLudoBoard() {
             const board = document.getElementById('ludo-board');
+            if (!board) return;
             board.innerHTML = ''; 
             
             const hex = { red: '#ff0000', green: '#00a200', blue: '#0078d7', yellow: '#ffe400' };
@@ -408,9 +389,7 @@
                         continue; 
                     }
 
-                    if (r > 5 && r < 9 && c > 5 && c < 9 && !(r === 6 && c === 6)) {
-                        continue;
-                    }
+                    if (r > 5 && r < 9 && c > 5 && c < 9 && !(r === 6 && c === 6)) continue;
 
                     const cell = document.createElement('div');
                     cell.className = 'ludo-cell';
@@ -420,11 +399,10 @@
                     cell.style.gridRow = `${r + 1}`;
                     cell.style.gridColumn = `${c + 1}`;
 
-                    if (r === 0 && c === 0) setupHomeBase(cell, 'red', hex.red, r, c);
-                    else if (r === 0 && c === 9) setupHomeBase(cell, 'green', hex.green, r, c);
-                    else if (r === 9 && c === 0) setupHomeBase(cell, 'blue', hex.blue, r, c);
-                    else if (r === 9 && c === 9) setupHomeBase(cell, 'yellow', hex.yellow, r, c);
-                    
+                    if (r === 0 && c === 0) setupHomeBase(cell, 'red', hex.red, r, c, board);
+                    else if (r === 0 && c === 9) setupHomeBase(cell, 'green', hex.green, r, c, board);
+                    else if (r === 9 && c === 0) setupHomeBase(cell, 'blue', hex.blue, r, c, board);
+                    else if (r === 9 && c === 9) setupHomeBase(cell, 'yellow', hex.yellow, r, c, board);
                     else if (r === 6 && c === 6) {
                         cell.style.gridRow = '7 / span 3';
                         cell.style.gridColumn = '7 / span 3';
@@ -452,7 +430,7 @@
             }
         }
 
-        function setupHomeBase(cell, colorStr, bgColor, r, c) {
+        function setupHomeBase(cell, colorStr, bgColor, r, c, board) {
             cell.style.gridRow = `${r + 1} / span 6`;
             cell.style.gridColumn = `${c + 1} / span 6`;
             cell.classList.add('home-container');
@@ -466,10 +444,9 @@
                     <div id="home-${colorStr}-3" class="rounded-full w-full h-full relative flex items-center justify-center border border-black/20" style="background-color: ${bgColor};"></div>
                 </div>
             `;
-            document.getElementById('ludo-board').appendChild(cell);
+            board.appendChild(cell);
         }
 
-        // 2. Render Tokens on the Board
         function renderTokens() {
             document.querySelectorAll('.ludo-token').forEach(el => el.remove());
 
@@ -480,16 +457,14 @@
                     tokenEl.innerText = token.id + 1; 
                     
                     let isClickable = false;
-                    // Only pulse if it's the Human's turn and NOT currently animating
                     if (gameState.hasRolled && color === gameState.currentPlayer && !gameState.winner && gameState.playerTypes[color] === 'human' && !gameState.isAnimating) {
                         if (token.state === 'home' && gameState.currentRoll === 6) isClickable = true;
                         if (token.state === 'active' && token.pos + gameState.currentRoll <= 56) isClickable = true;
                     }
 
-                    // NEW: Add the hopping animation class if this specific token is moving
                     if (gameState.isAnimating && gameState.animatingToken && gameState.animatingToken.color === color && gameState.animatingToken.id === token.id) {
                         tokenEl.classList.add('animate-hop');
-                        isClickable = false; // Prevent clicks while it is jumping
+                        isClickable = false; 
                     }
                     
                     if (isClickable) {
@@ -524,11 +499,9 @@
             });
         }
 
-        // 3. Token Move Logic & Capturing Rules
         function handleTokenMove(color, tokenId) {
             if (gameState.winner || gameState.isAnimating) return;
 
-            // Hide the overlay if it's currently showing
             const overlay = document.getElementById('camera-overlay');
             if (overlay && overlay.classList.contains('opacity-100')) {
                 overlay.classList.replace('opacity-100', 'opacity-0');
@@ -536,22 +509,20 @@
 
             const token = gameState.tokens[color].find(t => t.id === tokenId);
             
-            // NEW: Divert logic into the step-by-step animator
             if (token.state === 'home' && gameState.currentRoll === 6) {
-                animateMove(color, token, 1, true); // 1 hop out of home
+                animateMove(color, token, 1, true); 
             } 
             else if (token.state === 'active') {
-                animateMove(color, token, gameState.currentRoll, false); // Hop the dice roll amount
+                animateMove(color, token, gameState.currentRoll, false); 
             }
         }
 
-        // NEW: Step-by-Step Animation Loop
         function animateMove(color, token, steps, isExitingHome) {
             gameState.isAnimating = true;
             gameState.animatingToken = { color: color, id: token.id };
             let currentStep = 0;
 
-            updateGameUI(); // Lock the UI immediately
+            updateGameUI(); 
             
             const hopInterval = setInterval(() => {
                 currentStep++;
@@ -563,26 +534,28 @@
                     token.pos++;
                 }
                 
-                renderTokens(); // Triggers the CSS hop keyframe
+                renderTokens(); 
 
                 if (currentStep >= steps) {
                     clearInterval(hopInterval);
                     gameState.animatingToken = null;
-                    finalizeMove(color, token); // Movement finished, apply rules
+                    finalizeMove(color, token); 
                 }
-            }, 300); // 300ms matches our CSS animation duration
+            }, 300); 
         }
 
-        // NEW: Resolve Ludo Rules after animation finishes
         function finalizeMove(color, token) {
             let bonusTurn = false;
+            const diceResult = document.getElementById('dice-result');
             
             if (token.state === 'active') {
                 if (token.pos === 56) {
                     token.state = 'finished';
                     bonusTurn = true;
-                    document.getElementById('dice-result').innerText = `Token Finished! Bonus turn!`;
-                    document.getElementById('dice-result').classList.replace('text-emerald-400', 'text-yellow-400');
+                    if (diceResult) {
+                        diceResult.innerText = `Token Finished! Bonus turn!`;
+                        diceResult.classList.replace('text-emerald-400', 'text-yellow-400');
+                    }
                 }
                 else if (token.pos < 51) { 
                     const absPos = (START_INDICES[color] + token.pos) % 52;
@@ -600,8 +573,10 @@
                                             otherToken.state = 'home';
                                             otherToken.pos = -1;
                                             bonusTurn = true;
-                                            document.getElementById('dice-result').innerText = `Captured ${otherColor}! Bonus turn!`;
-                                            document.getElementById('dice-result').classList.replace('text-emerald-400', 'text-yellow-400');
+                                            if (diceResult) {
+                                                diceResult.innerText = `Captured ${otherColor}! Bonus turn!`;
+                                                diceResult.classList.replace('text-emerald-400', 'text-yellow-400');
+                                            }
                                         }
                                     }
                                 });
@@ -614,11 +589,13 @@
             const hasWon = gameState.tokens[color].every(t => t.state === 'finished');
             if (hasWon) {
                 gameState.winner = color;
-                document.getElementById('dice-result').innerText = `${color.toUpperCase()} WINS THE GAME!`;
-                document.getElementById('dice-result').className = 'text-xl text-yellow-400 font-black animate-bounce mt-4';
-                
+                if (diceResult) {
+                    diceResult.innerText = `${color.toUpperCase()} WINS THE GAME!`;
+                    diceResult.className = 'text-xl text-yellow-400 font-black animate-bounce mt-4';
+                }
                 const hexColors = {red: '#ff0000', green: '#00a200', blue: '#0078d7', yellow: '#ffe400'};
-                document.getElementById('ludo-board').style.boxShadow = `0 0 50px ${hexColors[color]}`;
+                const board = document.getElementById('ludo-board');
+                if (board) board.style.boxShadow = `0 0 50px ${hexColors[color]}`;
                 
                 gameState.isAnimating = false;
                 updateGameUI();
@@ -639,11 +616,13 @@
             renderTokens();
         }
 
-        // 4. Update Header UI & Check for AI Turns
         function updateGameUI() {
             const banner = document.getElementById('turn-banner');
             const text = document.getElementById('turn-text');
             const instructionStatus = document.getElementById('instruction-status');
+            const manualRollBtn = document.getElementById('manualRollBtn');
+            
+            if (!banner || !text || !instructionStatus || !manualRollBtn) return;
             
             if (gameState.winner) {
                 banner.className = `w-full mb-2 py-2 px-4 rounded-xl border border-yellow-400 bg-yellow-400/20 text-center animate-pulse`;
@@ -655,7 +634,6 @@
                 return;
             }
 
-            // NEW: Override UI entirely if an animation is currently playing
             if (gameState.isAnimating) {
                 instructionStatus.innerText = "Piece is moving...";
                 manualRollBtn.disabled = true;
@@ -674,48 +652,49 @@
 
             const theme = uiThemes[gameState.currentPlayer];
             
-            // Reapply basic theme styling
-            banner.className = `w-full mb-2 py-2 px-4 rounded-xl border ${theme.border} ${theme.bg} text-center transition-colors duration-500`;
+            banner.className = `w-full mb-2 py-2 px-4 rounded-xl border ${theme.border} ${theme.bg} text-center transition-colors duration-500 shrink-0`;
             banner.style.setProperty('--blink-glow', theme.glow);
-            text.className = `${theme.text} font-bold tracking-widest uppercase text-sm`;
+            text.className = `${theme.text} font-bold tracking-widest uppercase text-xs`;
             text.innerText = isHuman ? `Your Turn (${gameState.currentPlayer})` : `Bot Turn (${gameState.currentPlayer})`;
             
-            // --- NEW: Add blink animation if it is a new turn for the human ---
             if (isHuman && gameState.isNewTurn) {
-                banner.classList.remove('animate-blink-4'); // Reset
-                void banner.offsetWidth; // Trigger DOM reflow to restart animation reliably
+                banner.classList.remove('animate-blink-4'); 
+                void banner.offsetWidth; 
                 banner.classList.add('animate-blink-4');
-                gameState.isNewTurn = false; // Consume flag
+                gameState.isNewTurn = false; 
             }
             
-            // UI Instructions based on player type
             if (isHuman) {
                 if (gameState.hasRolled) instructionStatus.innerText = "Action: Hold 1-4 fingers";
                 else instructionStatus.innerText = "Action: Pinch to Roll";
                 
                 manualRollBtn.disabled = gameState.hasRolled;
-                if(gameState.hasRolled) manualRollBtn.classList.add('opacity-50');
+                if (gameState.hasRolled) manualRollBtn.classList.add('opacity-50');
                 else manualRollBtn.classList.remove('opacity-50');
             } else {
                 instructionStatus.innerText = "Bot is thinking...";
                 manualRollBtn.disabled = true;
                 manualRollBtn.classList.add('opacity-50');
                 
-                // --- BOT AI TRIGGER ---
                 if (!gameState.hasRolled) {
                     setTimeout(() => {
-                        if (!gameState.isAnimating) window.triggerDiceRoll(); // Verify no animation lock
+                        if (!gameState.isAnimating) window.triggerDiceRoll(); 
                     }, 1200);
                 }
             }
         }
 
-        // 5. Global Dice Roller & Simple AI Selection Logic
         window.triggerDiceRoll = function() {
             if (gameState.hasRolled || gameState.winner || gameState.isAnimating) return;
             
             const diceCube = document.getElementById('dice-cube');
             const diceResult = document.getElementById('dice-result');
+            
+            // Robust defensive check to ensure DOM elements exist before attempting to style/modify them
+            if (!diceCube || !diceResult) {
+                console.warn("Dice DOM elements not fully loaded yet.");
+                return;
+            }
             
             diceResult.innerText = "Rolling...";
             diceResult.classList.replace('text-yellow-400', 'text-emerald-400');
@@ -732,15 +711,12 @@
                 case 6: rx = 180; ry = 0; break;
             }
             
-            // Normalize current rotation to the nearest 360 loop
             const nearestX = Math.round(currentDiceX / 360) * 360;
             const nearestY = Math.round(currentDiceY / 360) * 360;
             
-            // Add exactly 2 full spins (720 deg) PLUS the specific face offset
             currentDiceX = nearestX + 720 + rx;
             currentDiceY = nearestY + 720 + ry;
             
-            // Fire the smooth CSS transition using the new accumulated rotation values
             diceCube.style.transform = `translateZ(-40px) rotateX(${currentDiceX}deg) rotateY(${currentDiceY}deg)`;
             
             setTimeout(() => {
@@ -751,7 +727,6 @@
                 
                 const isHuman = gameState.playerTypes[gameState.currentPlayer] === 'human';
 
-                // Get all legally movable tokens
                 const validTokens = gameState.tokens[gameState.currentPlayer].filter(t => {
                     if (t.state === 'home' && roll === 6) return true;
                     if (t.state === 'active' && t.pos + roll <= 56) return true;
@@ -772,14 +747,13 @@
                             const currentIdx = gameState.turnOrder.indexOf(gameState.currentPlayer);
                             gameState.currentPlayer = gameState.turnOrder[(currentIdx + 1) % gameState.turnOrder.length];
                             gameState.hasRolled = false;
-                            gameState.isNewTurn = true; // Signal turn change
+                            gameState.isNewTurn = true; 
                             updateGameUI();
                             renderTokens();
                         }
                     }, 1800);
                 } 
                 else if (isHuman && validTokens.length === 1 && roll !== 6) {
-                    // Auto-Move logic for HUMAN
                     diceResult.innerText += " (Auto-moving...)";
                     setTimeout(() => {
                         if (gameState.hasRolled && gameState.currentRoll === roll && !gameState.winner) {
@@ -789,14 +763,11 @@
                     }, 1500); 
                 }
                 else if (isHuman) {
-                    // NEW: Show tutorial overlay on first 6 rolled
                     if (roll === 6 && !hasShownFingerTutorial) {
                         const overlay = document.getElementById('camera-overlay');
                         if (overlay) {
                             overlay.classList.replace('opacity-0', 'opacity-100');
                             hasShownFingerTutorial = true;
-                            
-                            // Auto-hide after 5 seconds just in case they don't move immediately
                             setTimeout(() => {
                                 overlay.classList.replace('opacity-100', 'opacity-0');
                             }, 5000);
@@ -804,19 +775,16 @@
                     }
                 }
                 else if (!isHuman) {
-                    // --- BOT AI TOKEN SELECTION ---
                     diceResult.innerText += " (Bot deciding...)";
                     setTimeout(() => {
                         if (gameState.hasRolled && gameState.currentRoll === roll && !gameState.winner) {
                             diceResult.innerText = `Rolled a ${roll}!`;
                             
-                            // Smart logic: If roll is 6, prioritize bringing a token out of the base
                             let chosenToken = validTokens[0]; 
                             if (roll === 6) {
                                 const homeToken = validTokens.find(t => t.state === 'home');
                                 if (homeToken) chosenToken = homeToken;
                             } else {
-                                // Otherwise pick a random valid piece to move
                                 chosenToken = validTokens[Math.floor(Math.random() * validTokens.length)];
                             }
                             handleTokenMove(gameState.currentPlayer, chosenToken.id);
@@ -827,10 +795,9 @@
                 updateGameUI();
                 renderTokens();
                 
-            }, 1200); // NEW: Matches exactly with the 1.2s CSS transition time
+            }, 1200); 
         }
 
-        // 6. MediaPipe & Webcam Logic
         const HAND_CONNECTIONS = [
             [0,1],[1,2],[2,3],[3,4], [0,5],[5,6],[6,7],[7,8],
             [5,9],[9,10],[10,11],[11,12], [9,13],[13,14],[14,15],[15,16],
@@ -847,6 +814,7 @@
         }
 
         async function initializeHandTracking() {
+            if (systemStatusText) systemStatusText.innerText = "Loading Model...";
             try {
                 const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3/wasm");
                 handLandmarker = await HandLandmarker.createFromOptions(vision, {
@@ -857,139 +825,192 @@
                     runningMode: "VIDEO",
                     numHands: 1
                 });
-                loadingSpinner.classList.add('hidden');
-                systemStatusText.innerText = "Engine Ready";
-                enableWebcamButton.disabled = false;
-                pinchStatus.innerText = "Ready. Start Webcam.";
+                if (loadingSpinner) loadingSpinner.classList.add('hidden');
+                if (systemStatusText) systemStatusText.innerText = "Engine Ready";
+                if (enableWebcamButton) enableWebcamButton.disabled = false;
+                if (pinchStatus) pinchStatus.innerText = "Ready. Start Webcam.";
             } catch (error) {
-                systemStatusText.innerText = "Error Loading Model";
+                if (systemStatusText) systemStatusText.innerText = "Error Loading Model";
                 console.error(error);
             }
         }
 
-        enableWebcamButton.addEventListener("click", () => {
-            if (!handLandmarker) return;
-            webcamRunning = !webcamRunning;
-            if (webcamRunning) {
-                enableWebcamButton.innerHTML = `<i class="fa-solid fa-square"></i> <span>Stop Webcam</span>`;
-                enableWebcamButton.classList.replace('bg-emerald-500', 'bg-rose-500');
+        if (enableWebcamButton) {
+            enableWebcamButton.addEventListener("click", () => {
+                if (!handLandmarker) return;
                 
-                navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } }).then((stream) => {
-                    video.srcObject = stream;
-                    video.addEventListener("loadeddata", predictWebcam);
-                });
-            } else {
-                enableWebcamButton.innerHTML = `<i class="fa-solid fa-video"></i> <span>Start Webcam</span>`;
-                enableWebcamButton.classList.replace('bg-rose-500', 'bg-emerald-500');
-                video.srcObject.getTracks().forEach(track => track.stop());
-                video.srcObject = null;
-                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-                pinchStatus.innerText = "Offline";
-            }
-        });
+                if (!webcamRunning) {
+                    enableWebcamButton.disabled = true;
+                    enableWebcamButton.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> <span>Requesting...</span>`;
+                    
+                    navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
+                        .then((stream) => {
+                            webcamRunning = true;
+                            enableWebcamButton.disabled = false;
+                            enableWebcamButton.innerHTML = `<i class="fa-solid fa-square"></i> <span>Stop Webcam</span>`;
+                            enableWebcamButton.classList.replace('bg-emerald-500', 'bg-rose-500');
+                            
+                            if (video) {
+                                video.srcObject = stream;
+                                video.addEventListener("loadeddata", predictWebcam);
+                            }
+                            if (pinchStatus) {
+                                pinchStatus.innerText = "Ready to play!";
+                                pinchStatus.className = 'text-emerald-400';
+                            }
+                        })
+                        .catch((err) => {
+                            console.error("Camera access denied: ", err);
+                            webcamRunning = false;
+                            enableWebcamButton.disabled = false;
+                            enableWebcamButton.innerHTML = `<i class="fa-solid fa-video"></i> <span>Start Webcam</span>`;
+                            if (pinchStatus) {
+                                pinchStatus.innerText = "Camera Permission Denied";
+                                pinchStatus.className = 'text-red-500 font-bold';
+                            }
+                        });
+                } else {
+                    webcamRunning = false;
+                    enableWebcamButton.innerHTML = `<i class="fa-solid fa-video"></i> <span>Start Webcam</span>`;
+                    enableWebcamButton.classList.replace('bg-rose-500', 'bg-emerald-500');
+                    if (video && video.srcObject) {
+                        video.srcObject.getTracks().forEach(track => track.stop());
+                        video.srcObject = null;
+                    }
+                    if (canvasCtx && canvasElement) canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                    if (pinchStatus) {
+                        pinchStatus.innerText = "Offline";
+                        pinchStatus.className = 'text-slate-400';
+                    }
+                }
+            });
+        }
 
         async function predictWebcam() {
+            if (!video || !canvasElement || !canvasCtx) return;
+
             if (canvasElement.width !== video.videoWidth) {
                 canvasElement.width = video.videoWidth;
                 canvasElement.height = video.videoHeight;
             }
 
-            // Lock gesture inputs if game is over OR if a piece is currently hopping
-            if (webcamRunning && !gameState.winner && !gameState.isAnimating) {
-                let startTimeMs = performance.now();
-                if (lastVideoTime !== video.currentTime) {
-                    lastVideoTime = video.currentTime;
-                    const results = handLandmarker.detectForVideo(video, startTimeMs);
+            if (!webcamRunning) return;
+
+            if (gameState.winner) {
+                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                if (pinchStatus) pinchStatus.innerText = "Game Over";
+                return;
+            }
+
+            window.requestAnimationFrame(predictWebcam);
+
+            if (gameState.isAnimating) return;
+
+            let startTimeMs = performance.now();
+            if (lastVideoTime !== video.currentTime) {
+                lastVideoTime = video.currentTime;
+                const results = handLandmarker.detectForVideo(video, startTimeMs);
+                
+                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
                     
-                    canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+                if (results.landmarks && results.landmarks.length > 0) {
+                    const landmarks = results.landmarks[0];
+                    drawHand(landmarks);
                     
-                    if (results.landmarks && results.landmarks.length > 0) {
-                        const landmarks = results.landmarks[0];
-                        drawHand(landmarks);
-                        
-                        // Only process gestures if it's the HUMAN's turn
-                        const isHuman = gameState.playerTypes[gameState.currentPlayer] === 'human';
-                        
-                        if (isHuman) {
-                            if (!gameState.hasRolled) {
-                                // DICE ROLL GESTURE
-                                const thumbTip = landmarks[4];
-                                const indexTip = landmarks[8];
-                                const dist = Math.sqrt(Math.pow(thumbTip.x - indexTip.x, 2) + Math.pow(thumbTip.y - indexTip.y, 2));
-                                
-                                if (dist < 0.05) {
-                                    isPinched = true;
+                    const isHuman = gameState.playerTypes[gameState.currentPlayer] === 'human';
+                    
+                    if (isHuman) {
+                        if (!gameState.hasRolled) {
+                            const thumbTip = landmarks[4];
+                            const indexTip = landmarks[8];
+                            const dist = Math.sqrt(Math.pow(thumbTip.x - indexTip.x, 2) + Math.pow(thumbTip.y - indexTip.y, 2));
+                            
+                            if (dist < 0.05) {
+                                isPinched = true;
+                                if (pinchStatus) {
                                     pinchStatus.innerText = "Pinched!";
                                     pinchStatus.className = 'text-yellow-400 font-bold';
-                                } else if (isPinched && dist > 0.08) {
-                                    isPinched = false;
+                                }
+                            } else if (isPinched && dist > 0.08) {
+                                isPinched = false;
+                                if (pinchStatus) {
                                     pinchStatus.innerText = "Open";
                                     pinchStatus.className = 'text-emerald-400';
-                                    
-                                    const now = Date.now();
-                                    if (now - lastRollTime > 1500) { 
-                                        window.triggerDiceRoll();
-                                        lastRollTime = now;
-                                    }
                                 }
-                            } else {
-                                // TOKEN SELECTION GESTURE
-                                const fingers = getFingerCount(landmarks);
                                 
-                                if (fingers >= 1 && fingers <= 4) {
-                                    const tokenId = fingers - 1; 
-                                    const token = gameState.tokens[gameState.currentPlayer].find(t => t.id === tokenId);
-                                    
-                                    let isValid = false;
-                                    if (token && token.state === 'home' && gameState.currentRoll === 6) isValid = true;
-                                    if (token && token.state === 'active' && token.pos + gameState.currentRoll <= 56) isValid = true;
-                                    
-                                    if (isValid) {
-                                        if (detectedFingers === fingers) {
-                                            const holdTime = Date.now() - fingerHoldStartTime;
-                                            const percentage = Math.min(100, Math.floor((holdTime / 1000) * 100));
-                                            
-                                            pinchStatus.innerText = `Selecting Token ${fingers}... (${percentage}%)`;
-                                            pinchStatus.className = 'text-yellow-400 font-bold';
-                                            
-                                            if (holdTime >= 1000) { 
-                                                handleTokenMove(gameState.currentPlayer, tokenId);
-                                                detectedFingers = 0;
-                                                pinchStatus.innerText = "Moved!";
+                                const now = Date.now();
+                                if (now - lastRollTime > 1500) { 
+                                    window.triggerDiceRoll();
+                                    lastRollTime = now;
+                                }
+                            }
+                        } else {
+                            const fingers = getFingerCount(landmarks);
+                            
+                            if (fingers >= 1 && fingers <= 4) {
+                                const tokenId = fingers - 1; 
+                                const token = gameState.tokens[gameState.currentPlayer].find(t => t.id === tokenId);
+                                
+                                let isValid = false;
+                                if (token && token.state === 'home' && gameState.currentRoll === 6) isValid = true;
+                                if (token && token.state === 'active' && token.pos + gameState.currentRoll <= 56) isValid = true;
+                                
+                                if (isValid) {
+                                    if (detectedFingers === fingers) {
+                                        const holdTime = Date.now() - fingerHoldStartTime;
+                                        
+                                        if (pinchStatus) {
+                                            if (holdTime < 600) {
+                                                pinchStatus.innerText = "Analyzing fingers...";
+                                                pinchStatus.className = 'text-yellow-400 font-bold animate-pulse';
+                                            } else {
+                                                pinchStatus.innerText = `Detected Token ${fingers}!`;
+                                                pinchStatus.className = 'text-emerald-400 font-bold';
                                             }
-                                        } else {
-                                            detectedFingers = fingers;
-                                            fingerHoldStartTime = Date.now();
+                                        }
+                                        
+                                        if (holdTime >= 1000) { 
+                                            handleTokenMove(gameState.currentPlayer, tokenId);
+                                            detectedFingers = 0;
+                                            if (pinchStatus) pinchStatus.innerText = "Moved!";
                                         }
                                     } else {
-                                        detectedFingers = 0;
-                                        pinchStatus.innerText = `Token ${fingers} cannot move`;
-                                        pinchStatus.className = 'text-red-400';
+                                        detectedFingers = fingers;
+                                        fingerHoldStartTime = Date.now();
                                     }
                                 } else {
                                     detectedFingers = 0;
+                                    if (pinchStatus) {
+                                        pinchStatus.innerText = `Token ${fingers} cannot move`;
+                                        pinchStatus.className = 'text-red-400';
+                                    }
+                                }
+                            } else {
+                                detectedFingers = 0;
+                                if (pinchStatus) {
                                     pinchStatus.innerText = "Waiting for fingers...";
                                     pinchStatus.className = 'text-emerald-400';
                                 }
                             }
-                        } else {
+                        }
+                    } else {
+                        if (pinchStatus) {
                             pinchStatus.innerText = "Bot is playing...";
                             pinchStatus.className = 'text-slate-500';
                         }
-                    } else {
-                        detectedFingers = 0;
+                    }
+                } else {
+                    detectedFingers = 0;
+                    if (pinchStatus) {
                         pinchStatus.innerText = "No Hand Detected";
                         pinchStatus.className = 'text-slate-500';
                     }
                 }
-                window.requestAnimationFrame(predictWebcam);
-            } else if (gameState.winner) {
-                canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-                pinchStatus.innerText = "Game Over";
             }
         }
 
         function drawHand(landmarks) {
+            if (!canvasCtx || !canvasElement) return;
             canvasCtx.strokeStyle = '#10b981';
             canvasCtx.lineWidth = 4;
             for (const connection of HAND_CONNECTIONS) {
