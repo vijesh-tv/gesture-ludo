@@ -6,6 +6,10 @@
     <title>Gesture Ludo - Human vs AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- NEW: Canvas Confetti Library for winning animations -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+    
     <style>
         .mirror-container { transform: scaleX(-1); }
         #output_canvas {
@@ -271,7 +275,7 @@
     <script type="module">
         import { HandLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.3";
 
-        // Safely map DOM elements (using defensive getters later to avoid null property errors)
+        // Safely map DOM elements
         const video = document.getElementById('webcam');
         const canvasElement = document.getElementById('output_canvas');
         const canvasCtx = canvasElement ? canvasElement.getContext('2d') : null;
@@ -597,6 +601,23 @@
                 const board = document.getElementById('ludo-board');
                 if (board) board.style.boxShadow = `0 0 50px ${hexColors[color]}`;
                 
+                // --- NEW: Trigger Confetti Animation matching the winning color ---
+                if (window.confetti) {
+                    const duration = 4000; // Shoot confetti for 4 seconds
+                    const end = Date.now() + duration;
+                    const winColors = [hexColors[color], '#ffffff']; // Team color + white
+
+                    (function frame() {
+                        // Launch from left edge
+                        confetti({ particleCount: 5, angle: 60, spread: 55, origin: { x: 0 }, colors: winColors, zIndex: 1000 });
+                        // Launch from right edge
+                        confetti({ particleCount: 5, angle: 120, spread: 55, origin: { x: 1 }, colors: winColors, zIndex: 1000 });
+                        
+                        // Keep looping until duration ends
+                        if (Date.now() < end) requestAnimationFrame(frame);
+                    }());
+                }
+                
                 gameState.isAnimating = false;
                 updateGameUI();
                 renderTokens();
@@ -690,7 +711,6 @@
             const diceCube = document.getElementById('dice-cube');
             const diceResult = document.getElementById('dice-result');
             
-            // Robust defensive check to ensure DOM elements exist before attempting to style/modify them
             if (!diceCube || !diceResult) {
                 console.warn("Dice DOM elements not fully loaded yet.");
                 return;
@@ -904,8 +924,6 @@
 
             window.requestAnimationFrame(predictWebcam);
 
-            if (gameState.isAnimating) return;
-
             let startTimeMs = performance.now();
             if (lastVideoTime !== video.currentTime) {
                 lastVideoTime = video.currentTime;
@@ -916,6 +934,9 @@
                 if (results.landmarks && results.landmarks.length > 0) {
                     const landmarks = results.landmarks[0];
                     drawHand(landmarks);
+                    
+                    // NEW CHECK: Ignore gestures while pieces are hopping, but keep drawing the hand!
+                    if (gameState.isAnimating) return;
                     
                     const isHuman = gameState.playerTypes[gameState.currentPlayer] === 'human';
                     
