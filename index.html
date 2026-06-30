@@ -411,7 +411,8 @@
                         cell.style.gridRow = '7 / span 3';
                         cell.style.gridColumn = '7 / span 3';
                         cell.id = 'center-finish';
-                        cell.style.background = `conic-gradient(from 45deg, ${hex.green} 0deg 90deg, ${hex.yellow} 90deg 180deg, ${hex.blue} 180deg 270deg, ${hex.red} 270deg 360deg)`;
+                        // FIXED: Reordered colors so the central triangles match the adjacent safe paths perfectly
+                        cell.style.background = `conic-gradient(from 45deg, ${hex.yellow} 0deg 90deg, ${hex.blue} 90deg 180deg, ${hex.red} 180deg 270deg, ${hex.green} 270deg 360deg)`;
                         board.appendChild(cell);
                     }
                     else {
